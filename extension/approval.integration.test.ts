@@ -59,28 +59,66 @@ test("consumes external approval before the first retry", async () => {
   }
 });
 
-test("preserves the exact shell command through two confirmation prompts", async () => {
+test("reuses an approved issue creation for an equivalent API issue creation", async () => {
   const repository = checkout();
-  const command = `ISSUE_BODY="Approved issue" gh api repos/${external}/issues --method POST -f title="Approved" -f body="$ISSUE_BODY" --jq .html_url`;
+  const command = `gh api repos/${external}/issues --method POST -f title="Approved" -f body="Body"`;
   try {
     const instance = guard();
-    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({ block: true });
-    expect(instance.messages.at(-1)).toContain("using the unchanged Command value from the approved payload");
-
     instance.answer({
       toolName: "ask",
       input: {
-        questions: [{ id: "confirm_external_github_write", question: `Allow one GitHub issue creation to ${external}?` }],
+        questions: [{ id: "confirm_external_github_write", question: `Allow one GitHub issue creation in ${external}?` }],
       },
       details: { selectedOptions: ["Approve"] },
       isError: false,
     });
-    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({
-      reason: expect.stringContaining("No matching approval was recorded"),
-    });
-
-    approve(instance, "GitHub API write", external);
     expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toBeUndefined();
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("does not reuse an issue creation approval for an API issue update", async () => {
+  const repository = checkout();
+  const updateCommand = `gh api repos/${external}/issues/12 --method PATCH -f body="Changed"`;
+  const createCommand = `gh api repos/${external}/issues --method POST -f title="Created" -f body="Body"`;
+  try {
+    const instance = guard();
+    instance.answer({
+      toolName: "ask",
+      input: {
+        questions: [{ id: "confirm_external_github_write", question: `Allow one GitHub issue creation in ${external}?` }],
+      },
+      details: { selectedOptions: ["Approve"] },
+      isError: false,
+    });
+    expect(await instance.handler({ toolName: "bash", input: { command: updateCommand } }, context(repository))).toMatchObject({ block: true });
+    expect(await instance.handler({ toolName: "bash", input: { command: createCommand } }, context(repository))).toBeUndefined();
+    expect(await instance.handler({ toolName: "bash", input: { command: updateCommand } }, context(repository))).toMatchObject({
+      reason: expect.stringContaining("OMP ask confirmation requested"),
+    });
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("does not reuse a detailed issue approval for changed API fields", async () => {
+  const repository = checkout();
+  const command = `gh api repos/${external}/issues --method POST -f title="Changed" -f body="Changed"`;
+  try {
+    const instance = guard();
+    instance.answer({
+      toolName: "ask",
+      input: {
+        questions: [{
+          id: "confirm_external_github_write",
+          question: `Allow one GitHub issue creation in ${external}?\nIssue title: Original\nBody: Original`,
+        }],
+      },
+      details: { selectedOptions: ["Approve"] },
+      isError: false,
+    });
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({ block: true });
   } finally {
     rmSync(repository, { recursive: true, force: true });
   }
