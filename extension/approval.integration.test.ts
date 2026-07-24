@@ -59,6 +59,33 @@ test("consumes external approval before the first retry", async () => {
   }
 });
 
+test("preserves the exact shell command through two confirmation prompts", async () => {
+  const repository = checkout();
+  const command = `ISSUE_BODY="Approved issue" gh api repos/${external}/issues --method POST -f title="Approved" -f body="$ISSUE_BODY" --jq .html_url`;
+  try {
+    const instance = guard();
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({ block: true });
+    expect(instance.messages.at(-1)).toContain("using the unchanged Command value from the approved payload");
+
+    instance.answer({
+      toolName: "ask",
+      input: {
+        questions: [{ id: "confirm_external_github_write", question: `Allow one GitHub issue creation to ${external}?` }],
+      },
+      details: { selectedOptions: ["Approve"] },
+      isError: false,
+    });
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({
+      reason: expect.stringContaining("No matching approval was recorded"),
+    });
+
+    approve(instance, "GitHub API write", external);
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toBeUndefined();
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("retries an approved write when only intent changes", async () => {
   const repository = checkout();
   try {

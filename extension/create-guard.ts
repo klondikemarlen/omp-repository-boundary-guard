@@ -26,7 +26,7 @@ export function createRepositoryBoundaryGuard(): (pi: ExtensionAPI) => void {
         return { block: true, reason: `${reason}${authorizationDetail} A confirmation is already pending.` };
       }
       pi.sendUserMessage(
-        `Call the ask tool now with this exact payload: ${JSON.stringify(handoff.ask)}. If approved, retry exactly the blocked ${handoff.action}; otherwise stop.`,
+        `Call the ask tool now with this exact payload: ${JSON.stringify(handoff.ask)}. If approved, retry exactly the blocked ${handoff.action} using the unchanged Command value from the approved payload; otherwise stop.`,
         { deliverAs: "steer" },
       );
       return { block: true, reason: `${reason}${authorizationDetail} OMP ask confirmation requested.` };
