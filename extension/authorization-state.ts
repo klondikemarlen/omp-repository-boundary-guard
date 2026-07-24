@@ -1,5 +1,10 @@
 import type { ToolResultEvent } from "./contract.ts";
-import { approvedExternalQuestion, isApprovedConfirmation, isApprovedExternalConfirmation } from "../guard/approved-confirmation.ts";
+import {
+  approvedExternalQuestion,
+  isApprovedConfirmation,
+  isApprovedExternalConfirmation,
+  isEquivalentIssueCreationApproval,
+} from "../guard/approved-confirmation.ts";
 
 export type AuthorizationResult = "authorized" | "missing" | "mismatched";
 
@@ -52,7 +57,8 @@ export class AuthorizationState {
     const expectedEnd = question.indexOf("\n");
     if (
       this.#externalQuestion.slice(0, storedEnd < 0 ? this.#externalQuestion.length : storedEnd) !==
-      question.slice(0, expectedEnd < 0 ? question.length : expectedEnd)
+      question.slice(0, expectedEnd < 0 ? question.length : expectedEnd) &&
+      !isEquivalentIssueCreationApproval(this.#externalQuestion, question)
     ) return false;
     const storedDetails = this.#externalQuestion
       .split("\n")
@@ -62,7 +68,9 @@ export class AuthorizationState {
       .split("\n")
       .slice(1)
       .filter((line) => !line.startsWith("Current repository:") && !line.startsWith("Target repository:"));
-    if (storedDetails.join("\n") !== expectedDetails.join("\n")) return false;
+    if (storedDetails.join("\n") !== expectedDetails.join("\n") &&
+      !isEquivalentIssueCreationApproval(this.#externalQuestion, question)) return false;
+    this.#pending = undefined;
     this.#externalQuestion = undefined;
     return true;
   }
