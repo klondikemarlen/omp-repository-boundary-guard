@@ -184,3 +184,24 @@ test("rejects an approved retry for another repository", async () => {
     rmSync(repository, { recursive: true, force: true });
   }
 });
+test("uses the API endpoint repository for the boundary confirmation", async () => {
+  const repository = checkout();
+  const target = "klondikemarlen/marlens-skills-rules-and-tools";
+  const command = `gh api --method POST repos/${target}/issues -f title='Enforce PR Review Reactions Before Thread Resolution' -f body='Target repository: command/api' --jq '{number, html_url, title}'`;
+  const event = { toolName: "bash", input: { command } };
+  try {
+    const instance = guard();
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+    expect(instance.messages).toHaveLength(1);
+    const message = instance.messages[0]!;
+    const start = message.indexOf("{");
+    const end = message.indexOf("}. If approved", start) + 1;
+    const ask = JSON.parse(message.slice(start, end)) as { questions: [{ question: string }] };
+    expect(ask.questions[0].question).toContain(`\nTarget repository: ${target}`);
+    expect(ask.questions[0].question).not.toContain("\nTarget repository: command/api");
+    approve(instance, "GitHub API write", target);
+    expect(await instance.handler(event, context(repository))).toBeUndefined();
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});

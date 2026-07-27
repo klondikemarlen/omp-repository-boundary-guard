@@ -192,3 +192,53 @@ test("keeps default field semantics guarded", () => {
     ),
   ).toMatchObject({ action: "GitHub API write", target: "elsewhere/example" });
 });
+test("uses the API endpoint repository over repository-shaped payload text", () => {
+  const repository = "klondikemarlen/marlens-skills-rules-and-tools";
+  const write = githubApiWrite(
+    [
+      "gh",
+      "api",
+      "--method",
+      "POST",
+      `repos/${repository}/issues`,
+      "-f",
+      "body=Current repository: icefoganalytics/wrap Target repository: command/api",
+    ],
+    2,
+    {
+      command: `gh api --method POST repos/${repository}/issues -f body="Current repository: icefoganalytics/wrap Target repository: command/api"`,
+    },
+  );
+
+  expect(write).toMatchObject({ action: "GitHub API write", target: repository });
+});
+
+test("ignores repository-shaped API payload paths", () => {
+  const repository = "klondikemarlen/marlens-skills-rules-and-tools";
+  const write = githubApiWrite(
+    ["gh", "api", `repos/${repository}/issues`, "-f", "body=see /repos/evil/repo"],
+    2,
+    { command: `gh api repos/${repository}/issues -f body='see /repos/evil/repo'` },
+  );
+
+  expect(write).toMatchObject({ action: "GitHub API write", target: repository });
+});
+test("preserves an explicit repository for relative API endpoints", () => {
+  const write = githubApiWrite(
+    ["gh", "api", "--repo", "elsewhere/example", "issues", "--method", "POST", "-f", "body=see /repos/evil/repo"],
+    2,
+    { command: "gh api --repo elsewhere/example issues --method POST -f body='see /repos/evil/repo'" },
+  );
+
+  expect(write).toMatchObject({ action: "GitHub API write", target: "elsewhere/example" });
+});
+test("ignores compact field payload paths", () => {
+  const repository = "klondikemarlen/marlens-skills-rules-and-tools";
+  const write = githubApiWrite(
+    ["gh", "api", `repos/${repository}/issues`, "-fbody=see /repos/evil/repo"],
+    2,
+    { command: `gh api repos/${repository}/issues -fbody='see /repos/evil/repo'` },
+  );
+
+  expect(write).toMatchObject({ action: "GitHub API write", target: repository });
+});

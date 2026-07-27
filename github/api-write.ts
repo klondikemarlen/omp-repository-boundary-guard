@@ -318,8 +318,13 @@ export function githubApiWrite(words: (string | undefined)[], index: number, inp
   let methodExplicit = false;
   let hasFields = false;
 
+  let skipNext = false;
   for (; index < words.length; index += 1) {
     const word = words[index];
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
     if (word === "--method" || word === "-X") {
       const value = words[index + 1];
       methodExplicit = true;
@@ -335,10 +340,20 @@ export function githubApiWrite(words: (string | undefined)[], index: number, inp
       else methodUnresolved = true;
       continue;
     }
-    hasFields ||= word === "--raw-field" || word === "-f" || word === "--field" || word === "-F" || word === "--input" ||
-      (typeof word === "string" && (word.startsWith("--raw-field=") || word.startsWith("--field=") || word.startsWith("-f") || word.startsWith("-F")));
+    const fieldFlag = word === "--raw-field" || word === "-f" || word === "--field" || word === "-F" || word === "--input" ||
+      (typeof word === "string" && (word.startsWith("--raw-field=") || word.startsWith("--field=") || word.startsWith("--input=") || word.startsWith("-f") || word.startsWith("-F")));
+    const valueFlag = fieldFlag || word === "--hostname" || word === "--jq" || word === "--template" || word === "--header" || word === "-H" ||
+      (typeof word === "string" && /^(?:--hostname|--jq|--template|--header|-H)=/.test(word));
+    if (valueFlag) {
+      hasFields ||= fieldFlag;
+      if (!isGraphQL) {
+        skipNext = word === "--raw-field" || word === "-f" || word === "--field" || word === "-F" || word === "--input" ||
+          word === "--hostname" || word === "--jq" || word === "--template" || word === "--header" || word === "-H";
+        continue;
+      }
+    }
     const path = typeof word === "string" ? word.match(/(?:^|\/)repos\/([^/\s]+)\/([^/?\s]+)/i) : undefined;
-    if (!target && path) target = normalizeRepository(`${path[1]}/${path[2]}`);
+    if (path && (!isGraphQL || !target)) target = normalizeRepository(`${path[1]}/${path[2]}`);
   }
 
   if (!methodUnresolved && method === "GET" && (!hasFields || methodExplicit)) return undefined;
