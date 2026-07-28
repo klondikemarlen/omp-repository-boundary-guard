@@ -342,6 +342,7 @@ test("permits approved target-explicit pull request and issue mutations", async 
     const instance = guard();
     for (const [command, action] of [
       [`gh pr edit 79 --repo ${external} --body "Updated"`, "GitHub pull request update"],
+      [`gh pr comment 79 --repo ${external} --body "Updated"`, "GitHub pull request update"],
       [`gh pr merge 79 --repo ${external} --merge --delete-branch`, "GitHub pull request update"],
       [`gh issue close 76 --repo ${external} --comment "Resolved"`, "GitHub issue update"],
     ]) {
