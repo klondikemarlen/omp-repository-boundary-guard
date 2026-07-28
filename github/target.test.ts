@@ -20,6 +20,12 @@ test("does not infer repository-shaped payload values", () => {
   }
 });
 
+test("preserves an explicit repository after an unexpanded body value", () => {
+  expect(githubTarget(["gh", "issue", "comment", "1", "--body", undefined, "--repo", external], 3)).toMatchObject({
+    target: external,
+  });
+});
+
 test("ignores unlisted payload file values without losing positionals", () => {
   expect(githubTarget(["gh", "issue", "create", "--body-file", external], 3)).toMatchObject({ target: undefined, targetUnresolved: false });
   expect(githubTarget(["gh", "issue", "create", "--body-file=body.md", external], 3)).toMatchObject({ target: external, targetUnresolved: false });

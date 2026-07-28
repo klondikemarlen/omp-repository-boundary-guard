@@ -38,11 +38,20 @@ export function githubTarget(words: (string | undefined)[], index: number, title
   let bodyDescription: string | undefined;
   let explicitTarget = false;
   let skipNext = false;
+  let opaquePayload = false;
 
   for (; index < words.length; index += 1) {
     const word = words[index];
+    if (opaquePayload) {
+      if (word === undefined) continue;
+      const isRepositoryOption = word === "--repo" || word === "-R" ||
+        (typeof word === "string" && (word.startsWith("--repo=") || word.startsWith("-R=")));
+      opaquePayload = false;
+      if (!isRepositoryOption) continue;
+    }
     if (skipNext) {
       skipNext = false;
+      opaquePayload = word === undefined;
       continue;
     }
     if (word === "--repo" || word === "-R") {
