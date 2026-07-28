@@ -17,6 +17,36 @@ test("resolves nested checkout origins", () => {
   }
 });
 
+test("resolves an enclosing checkout past invalid nested Git metadata", () => {
+  const repository = checkout();
+  const nested = `${repository}/api`;
+  try {
+    mkdirSync(`${nested}/src`, { recursive: true });
+    writeFileSync(`${nested}/.git`, "");
+    expect(currentCheckoutRepository(`${nested}/src`)).toBe(current);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("permits edits below invalid nested Git metadata", async () => {
+  const repository = checkout();
+  const nested = `${repository}/api`;
+  const target = `${nested}/src/inside.ts`;
+  try {
+    mkdirSync(`${nested}/src`, { recursive: true });
+    writeFileSync(`${nested}/.git`, "");
+    const instance = guard();
+    const result = await instance.handler(
+      { toolName: "edit", input: { input: `[file ${target}#ABCD]\nSWAP 1.=1:\n+export {};` } },
+      context(repository),
+    );
+    expect([result, instance.messages]).toEqual([undefined, []]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("resolves worktree origins", () => {
   const repository = checkout();
   const worktree = `/tmp/omp-repository-boundary-guard-${crypto.randomUUID()}`;

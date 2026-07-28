@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { relative } from "node:path";
 
 import {
@@ -52,6 +52,25 @@ test("keeps same-origin GitHub writes inside a worktree", async () => {
   }
 });
 
+test("guards external GitHub writes from nested invalid Git metadata", () => {
+  const repository = checkout();
+  const nested = `${repository}/api`;
+  try {
+    mkdirSync(`${nested}/src`, { recursive: true });
+    writeFileSync(`${nested}/.git`, "");
+    expect(repositoryMutationHandoff(
+      { toolName: "bash", input: { command: `gh issue create --repo ${external}` } },
+      `${nested}/src`,
+    )).toMatchObject({
+      decision: "ask",
+      currentRepository: current,
+      target: external,
+    });
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("guards cross-repository pull-request comments", async () => {
   const repository = checkout();
   const command = `gh pr comment 1 --repo ${external} --body "External"`;
@@ -64,6 +83,23 @@ test("guards cross-repository pull-request comments", async () => {
     const instance = guard();
     expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({ block: true });
     expect(instance.messages).toHaveLength(1);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("passes temporary body files without a boundary prompt", async () => {
+  const repository = checkout();
+  const command = "gh issue create --body-file /tmp/omp-repository-boundary-guard-issue.md";
+  try {
+    expect(repositoryMutationHandoff({ toolName: "bash", input: { command } }, repository)).toMatchObject({
+      decision: "allow",
+      currentRepository: current,
+      target: current,
+    });
+    const instance = guard();
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toBeUndefined();
+    expect(instance.messages).toEqual([]);
   } finally {
     rmSync(repository, { recursive: true, force: true });
   }
