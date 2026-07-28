@@ -69,6 +69,23 @@ test("guards cross-repository pull-request comments", async () => {
   }
 });
 
+test("ignores repository-shaped text in an ANSI-C body", async () => {
+  const repository = checkout();
+  const command = `gh issue comment 134 --body $'Evidence from https://github.com/icefoganalytics/wrap.git, and then cleanup.'`;
+  try {
+    expect(repositoryMutationHandoff({ toolName: "bash", input: { command } }, repository)).toMatchObject({
+      decision: "allow",
+      currentRepository: current,
+      target: current,
+    });
+    const instance = guard();
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toBeUndefined();
+    expect(instance.messages).toEqual([]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 
 
 
