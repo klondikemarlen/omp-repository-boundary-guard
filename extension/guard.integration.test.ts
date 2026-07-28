@@ -52,6 +52,23 @@ test("keeps same-origin GitHub writes inside a worktree", async () => {
   }
 });
 
+test("guards cross-repository pull-request comments", async () => {
+  const repository = checkout();
+  const command = `gh pr comment 1 --repo ${external} --body "External"`;
+  try {
+    expect(repositoryMutationHandoff({ toolName: "bash", input: { command } }, repository)).toMatchObject({
+      decision: "ask",
+      action: "GitHub pull request update",
+      target: external,
+    });
+    const instance = guard();
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({ block: true });
+    expect(instance.messages).toHaveLength(1);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 
 
 
