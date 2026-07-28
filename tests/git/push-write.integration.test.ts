@@ -3,8 +3,8 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { relative } from "node:path";
 
-import { repositoryMutationHandoff } from "../index.ts";
-import { approve, checkout, context, external, guard } from "./test-support.ts";
+import { repositoryMutationHandoff } from "../../index.ts";
+import { approve, checkout, context, external, guard } from "../extension/test-support.ts";
 
 test("passes same-origin pushes", async () => {
   const repository = checkout();

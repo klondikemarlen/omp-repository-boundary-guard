@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { githubTarget, isHelpRequest } from "./target.ts";
+import { githubTarget, isHelpRequest } from "../../github/target.ts";
 
 const current = "owner/current";
 const external = "elsewhere/example";

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { toolDirectory } from "./directory.ts";
+import { toolDirectory } from "../../shell/directory.ts";
 
 test("tracks a supported later cd before a GitHub command", () => {
   expect(toolDirectory({ command: "true && cd /tmp/../var && gh issue create" }, "/workspace"))

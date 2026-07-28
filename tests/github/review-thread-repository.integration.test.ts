@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { expect, test } from "bun:test";
 
-import { AuthorizationState } from "../extension/authorization-state.ts";
-import type { ToolCallEvent } from "../extension/contract.ts";
-import { repositoryMutationHandoff } from "../guard/handoff.ts";
+import { AuthorizationState } from "../../extension/authorization-state.ts";
+import type { ToolCallEvent } from "../../extension/contract.ts";
+import { repositoryMutationHandoff } from "../../guard/handoff.ts";
 
 function reviewThreadMutationDocument(threadId: string): string {
   return `mutation {

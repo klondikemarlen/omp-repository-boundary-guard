@@ -3,8 +3,8 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { currentCheckoutRepository } from "../index.ts";
-import { approve, checkout, context, current, external, guard } from "./test-support.ts";
+import { currentCheckoutRepository } from "../../index.ts";
+import { approve, checkout, context, current, external, guard } from "../extension/test-support.ts";
 
 test("resolves nested checkout origins", () => {
   const repository = checkout();
