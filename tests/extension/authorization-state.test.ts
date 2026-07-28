@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { AuthorizationState } from "./authorization-state.ts";
+import { AuthorizationState } from "../../extension/authorization-state.ts";
 
 const question = "Allow one git push to elsewhere/example?";
 

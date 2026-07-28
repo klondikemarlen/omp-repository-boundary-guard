@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { executableIndex } from "./executable-index.ts";
+import { executableIndex } from "../../shell/executable-index.ts";
 
 test("skips environment assignments before a command", () => {
   expect(executableIndex(["GH_HOST=github.com", "TOKEN=value", "gh", "pr", "create"])).toBe(2);

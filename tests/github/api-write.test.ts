@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { githubApiWrite } from "./api-write.ts";
-import { reviewThreadRepository } from "./review-thread-repository.ts";
+import { githubApiWrite } from "../../github/api-write.ts";
+import { reviewThreadRepository } from "../../github/review-thread-repository.ts";
 
 function graphqlWrite(document: string) {
   return githubApiWrite(["gh", "api", "graphql", "-f", `query=${document}`], 2, { command: "gh api graphql" });

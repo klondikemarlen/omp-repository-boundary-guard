@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { guardDecision } from "./decision.ts";
+import { guardDecision } from "../../guard/decision.ts";
 
 test("allows writes to the invoking checkout", () => {
   expect(guardDecision({ action: "git push", target: "owner/repository" }, "owner/repository")).toEqual({ allow: true });

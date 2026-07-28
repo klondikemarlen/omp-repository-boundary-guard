@@ -6,7 +6,7 @@ import { relative } from "node:path";
 import {
   currentCheckoutRepository,
   repositoryMutationHandoff,
-} from "../index.ts";
+} from "../../index.ts";
 import {
   approve,
   checkout,

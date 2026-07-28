@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 
-import { createRepositoryBoundaryGuard, type ToolCallHandler } from "../index.ts";
+import { createRepositoryBoundaryGuard, type ToolCallHandler } from "../../index.ts";
 
 export const current = "klondikemarlen/omp-repository-boundary-guard";
 export const external = "elsewhere/example";
