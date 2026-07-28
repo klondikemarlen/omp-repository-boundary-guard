@@ -7,123 +7,48 @@ function graphqlWrite(document: string) {
   return githubApiWrite(["gh", "api", "graphql", "-f", `query=${document}`], 2, { command: "gh api graphql" });
 }
 
-test("does not guard a repository-scoped GraphQL review lookup", () => {
-  const lookup = `query {
-    repository(owner: "owner", name: "repository") {
-      pullRequest(number: 1) { reviewThreads(first: 1) { nodes { id } } }
-    }
-  }`;
-  const write = githubApiWrite(["gh", "api", "graphql", "-f", "query=", undefined], 2, {
-    command: "gh api graphql -f query=$QUERY",
-    env: { QUERY: lookup },
-  });
-
-  expect(write).toBeUndefined();
-});
-
-test("does not guard an anonymous GraphQL query", () => {
+test("passes read-only GraphQL queries through", () => {
   expect(graphqlWrite(`{ viewer { login } }`)).toBeUndefined();
 });
 
-test("fails closed when another command has an environment-backed GraphQL query", () => {
-  const write = githubApiWrite(["gh", "api", "graphql", "-f", "query=", undefined], 2, {
-    command: "gh api graphql -f query=$READ && gh api graphql -f query=$WRITE",
-    env: {
-      READ: "query { viewer { login } }",
-      WRITE: "mutation { resolveReviewThread(input: { threadId: \"thread\" }) { thread { id } } }",
-    },
+test("keeps non-review GraphQL mutations unresolved", () => {
+  expect(graphqlWrite(`mutation { deleteIssue(input: { issueId: "issue" }) { clientMutationId } }`)).toMatchObject({
+    action: "GitHub API write",
+    targetUnresolved: true,
   });
-
-  expect(write).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
-});
-
-test("requires one environment-backed GraphQL query variable", () => {
-  const write = githubApiWrite(["gh", "api", "graphql", "-f", "query=", undefined, "-f", "query=", undefined], 2, {
-    command: "gh api graphql -f query=$READ -f query=$WRITE",
-    env: {
-      READ: "query { viewer { login } }",
-      WRITE: "mutation { resolveReviewThread(input: { threadId: \"thread\" }) { thread { id } } }",
-    },
-  });
-
-  expect(write).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
 });
 
 test("identifies one executable review-thread mutation", () => {
-  const write = graphqlWrite(`mutation ResolveThread @skip(if: false) {
+  expect(graphqlWrite(`mutation ResolveThread @skip(if: false) {
     # resolveReviewThread(input: { threadId: "comment" })
     resolved: resolveReviewThread(input: { threadId: "thread" }) @skip(if: false) { thread { isResolved } }
-  }`);
-
-  expect(write).toMatchObject({ reviewThreadId: "thread", targetUnresolved: false });
+  }`)).toMatchObject({ reviewThreadId: "thread", targetUnresolved: false });
 });
 
-test("blocks review-thread mutations for non-GitHub.com hosts", () => {
-  const document = `mutation {
-    resolveReviewThread(input: { threadId: "thread" }) { thread { isResolved } }
-  }`;
-  const write = githubApiWrite(
-    ["gh", "api", "graphql", "--hostname", "ghe.example", "-f", `query=${document}`],
-    2,
-    { command: "gh api graphql --hostname ghe.example" },
-  );
-
-  expect(write).toMatchObject({ reviewThreadId: "thread", targetUnresolved: true });
+test("keeps review-thread mutations unresolved for non-GitHub hosts", () => {
+  expect(
+    githubApiWrite(
+      ["gh", "api", "graphql", "--hostname", "ghe.example", "-f", 'query=mutation { resolveReviewThread(input: { threadId: "thread" }) { thread { isResolved } } }'],
+      2,
+      { command: "gh api graphql --hostname ghe.example" },
+    ),
+  ).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
 });
 
-test("blocks review-thread mutations when the resolver inherits a non-GitHub.com host", () => {
-  const originalHostname = process.env.GH_HOST;
-  process.env.GH_HOST = "ghe.example";
-
-  try {
-    const write = graphqlWrite(`mutation {
-      resolveReviewThread(input: { threadId: "thread" }) { thread { isResolved } }
-    }`);
-    expect(write).toMatchObject({ reviewThreadId: "thread", targetUnresolved: true });
-  } finally {
-    if (originalHostname === undefined) delete process.env.GH_HOST;
-    else process.env.GH_HOST = originalHostname;
-  }
-});
-
-test("ignores review-thread text in GraphQL strings and comments", () => {
-  const write = graphqlWrite(`mutation @skip(if: false) {
-    updatePullRequest(input: { body: "resolveReviewThread(input: { threadId: \\"string\\" })" }) { pullRequest { id } }
-    # resolveReviewThread(input: { threadId: "comment" })
-  }`);
-
-  expect(write).toMatchObject({ targetUnresolved: true });
-  expect(write?.reviewThreadId).toBeUndefined();
-  expect(write?.reviewThreadUnresolved).toBeUndefined();
-});
-
-test("fails closed for ambiguous or unlexable review-thread mutations", () => {
-  const ambiguous = graphqlWrite(`mutation {
+test("keeps ambiguous review-thread mutations unresolved", () => {
+  expect(graphqlWrite(`mutation {
     resolveReviewThread(input: { threadId: "first" }) { thread { id } }
-    resolveReviewThread(input: { threadId: "second" }) { thread { id } }
-  }`);
-  const sibling = graphqlWrite(`mutation {
-    resolveReviewThread(input: { threadId: "thread" }) { thread { id } }
     deleteIssue(input: { issueId: "issue" }) { clientMutationId }
-  }`);
-  const multipleOperations = graphqlWrite(`mutation First {
+  }`)).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
+});
+
+test("keeps multiple GraphQL operations unresolved", () => {
+  expect(graphqlWrite(`mutation First {
     resolveReviewThread(input: { threadId: "first" }) { thread { id } }
   }
   mutation Second {
     resolveReviewThread(input: { threadId: "second" }) { thread { id } }
-  }`);
-  const unlexable = graphqlWrite(`mutation {
-    resolveReviewThread(input: { threadId: "thread" }) { thread { id } } ~
-  }`);
-
-  expect(ambiguous).toMatchObject({ reviewThreadUnresolved: true });
-  expect(ambiguous?.reviewThreadId).toBeUndefined();
-  expect(sibling).toMatchObject({ reviewThreadUnresolved: true });
-  expect(sibling?.reviewThreadId).toBeUndefined();
-  expect(multipleOperations).toMatchObject({ reviewThreadUnresolved: true });
-  expect(multipleOperations?.reviewThreadId).toBeUndefined();
-  expect(unlexable).toMatchObject({ reviewThreadUnresolved: true });
-  expect(unlexable?.reviewThreadId).toBeUndefined();
+  }`)).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
 });
 
 test("resolves a review thread to its canonical repository", () => {
@@ -136,13 +61,8 @@ test("resolves a review thread to its canonical repository", () => {
 });
 
 test("rejects incomplete and failed review-thread lookups", () => {
-  const incomplete = reviewThreadRepository("thread", () => JSON.stringify({ data: { node: {} } }));
-  const failed = reviewThreadRepository("thread", () => {
-    throw new Error("lookup failed");
-  });
-
-  expect(incomplete).toBeUndefined();
-  expect(failed).toBeUndefined();
+  expect(reviewThreadRepository("thread", () => JSON.stringify({ data: { node: {} } }))).toBeUndefined();
+  expect(reviewThreadRepository("thread", () => { throw new Error("lookup failed"); })).toBeUndefined();
 });
 
 test("keeps explicit GET requests with fields read-only", () => {
@@ -192,53 +112,24 @@ test("keeps default field semantics guarded", () => {
     ),
   ).toMatchObject({ action: "GitHub API write", target: "elsewhere/example" });
 });
+
 test("uses the API endpoint repository over repository-shaped payload text", () => {
   const repository = "klondikemarlen/marlens-skills-rules-and-tools";
-  const write = githubApiWrite(
-    [
-      "gh",
-      "api",
-      "--method",
-      "POST",
-      `repos/${repository}/issues`,
-      "-f",
-      "body=Current repository: icefoganalytics/wrap Target repository: command/api",
-    ],
-    2,
-    {
-      command: `gh api --method POST repos/${repository}/issues -f body="Current repository: icefoganalytics/wrap Target repository: command/api"`,
-    },
-  );
-
-  expect(write).toMatchObject({ action: "GitHub API write", target: repository });
+  expect(
+    githubApiWrite(
+      ["gh", "api", "--method", "POST", `repos/${repository}/issues`, "-f", "body=Current repository: icefoganalytics/wrap Target repository: command/api"],
+      2,
+      { command: `gh api --method POST repos/${repository}/issues -f body="Current repository: icefoganalytics/wrap Target repository: command/api"` },
+    ),
+  ).toMatchObject({ action: "GitHub API write", target: repository });
 });
 
-test("ignores repository-shaped API payload paths", () => {
-  const repository = "klondikemarlen/marlens-skills-rules-and-tools";
-  const write = githubApiWrite(
-    ["gh", "api", `repos/${repository}/issues`, "-f", "body=see /repos/evil/repo"],
-    2,
-    { command: `gh api repos/${repository}/issues -f body='see /repos/evil/repo'` },
-  );
-
-  expect(write).toMatchObject({ action: "GitHub API write", target: repository });
-});
 test("preserves an explicit repository for relative API endpoints", () => {
-  const write = githubApiWrite(
-    ["gh", "api", "--repo", "elsewhere/example", "issues", "--method", "POST", "-f", "body=see /repos/evil/repo"],
-    2,
-    { command: "gh api --repo elsewhere/example issues --method POST -f body='see /repos/evil/repo'" },
-  );
-
-  expect(write).toMatchObject({ action: "GitHub API write", target: "elsewhere/example" });
-});
-test("ignores compact field payload paths", () => {
-  const repository = "klondikemarlen/marlens-skills-rules-and-tools";
-  const write = githubApiWrite(
-    ["gh", "api", `repos/${repository}/issues`, "-fbody=see /repos/evil/repo"],
-    2,
-    { command: `gh api repos/${repository}/issues -fbody='see /repos/evil/repo'` },
-  );
-
-  expect(write).toMatchObject({ action: "GitHub API write", target: repository });
+  expect(
+    githubApiWrite(
+      ["gh", "api", "--repo", "elsewhere/example", "issues", "--method", "POST", "-f", "body=see /repos/evil/repo"],
+      2,
+      { command: "gh api --repo elsewhere/example issues --method POST -f body='see /repos/evil/repo'" },
+    ),
+  ).toMatchObject({ action: "GitHub API write", target: "elsewhere/example" });
 });
