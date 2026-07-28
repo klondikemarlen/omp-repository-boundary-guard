@@ -34,6 +34,7 @@ test("keeps same-origin GitHub writes inside a worktree", async () => {
       [`gh issue create --repo ${current} --title "Same checkout"`, "GitHub issue creation"],
       [`gh pr create --repo ${current}`, "GitHub pull request creation"],
       [`gh pr merge 1 --repo ${current} --merge --delete-branch`, "GitHub pull request update"],
+      [`gh pr comment 1 --body "Same repository"`, "GitHub pull request update"],
     ]) {
       expect(repositoryMutationHandoff({ toolName: "bash", input: { command } }, worktree)).toMatchObject({
         decision: "allow",
