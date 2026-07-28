@@ -1,16 +1,20 @@
 import type { ToolResultEvent } from "./contract.ts";
 import {
   approvedExternalQuestion,
+  externalConfirmationQuestionId,
   isApprovedConfirmation,
   isApprovedExternalConfirmation,
   isEquivalentIssueCreationApproval,
+  submittedConfirmationQuestion,
 } from "../guard/approved-confirmation.ts";
+import { confirmationQuestionId } from "../guard/confirmation-question.ts";
 
-export type AuthorizationResult = "authorized" | "missing" | "mismatched";
+export type AuthorizationResult = "authorized" | "missing" | "mismatched" | "rejected";
 
 export class AuthorizationState {
   #pending: { key: string; question: string } | undefined;
   #authorizedKey: string | undefined;
+  #rejectedKey: string | undefined;
   #externalQuestion: string | undefined;
   #sessionDirectory: string | undefined;
 
@@ -23,6 +27,7 @@ export class AuthorizationState {
     this.#sessionDirectory = directory;
     this.#pending = undefined;
     this.#authorizedKey = undefined;
+    this.#rejectedKey = undefined;
     this.#externalQuestion = undefined;
   }
 
@@ -31,24 +36,35 @@ export class AuthorizationState {
 
     const pending = this.#pending;
     const externalQuestion = approvedExternalQuestion(event.input, event.details);
+    const submittedQuestion =
+      submittedConfirmationQuestion(event.input, confirmationQuestionId) ??
+      submittedConfirmationQuestion(event.input, externalConfirmationQuestionId);
     if (!pending) {
       if (externalQuestion) this.#externalQuestion = externalQuestion;
       return;
     }
+    if (submittedQuestion !== pending.question &&
+      !(externalQuestion && isApprovedExternalConfirmation(event.input, event.details, pending.question))) return;
 
     this.#pending = undefined;
     if (isApprovedConfirmation(event.input, event.details, pending.question)) {
       this.#authorizedKey = pending.key;
     } else if (externalQuestion && isApprovedExternalConfirmation(event.input, event.details, pending.question)) {
       this.#externalQuestion = externalQuestion;
+    } else {
+      this.#rejectedKey = pending.key;
     }
   }
 
   consume(key: string): AuthorizationResult {
     const authorizedKey = this.#authorizedKey;
     this.#authorizedKey = undefined;
-    if (!authorizedKey) return "missing";
-    return authorizedKey === key ? "authorized" : "mismatched";
+    if (authorizedKey) return authorizedKey === key ? "authorized" : "mismatched";
+
+    const rejectedKey = this.#rejectedKey;
+    if (rejectedKey === key) return "rejected";
+    this.#rejectedKey = undefined;
+    return "missing";
   }
 
   consumeExternal(question: string): boolean {
@@ -77,6 +93,7 @@ export class AuthorizationState {
 
   begin(key: string, question: string): boolean {
     if (this.#pending) return false;
+    this.#rejectedKey = undefined;
     this.#pending = { key, question };
     return true;
   }

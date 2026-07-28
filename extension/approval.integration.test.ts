@@ -205,3 +205,29 @@ test("uses the API endpoint repository for the boundary confirmation", async () 
     rmSync(repository, { recursive: true, force: true });
   }
 });
+test("does not repeat a confirmation after a custom answer", async () => {
+  const repository = checkout();
+  const event = { toolName: "bash", input: { command: `gh issue create --repo ${external} --title "Custom answer"` } };
+  try {
+    const instance = guard();
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+    const message = instance.messages[0]!;
+    const start = message.indexOf("{");
+    const end = message.indexOf("}. If approved", start) + 1;
+    const ask = JSON.parse(message.slice(start, end)) as Record<string, unknown>;
+    instance.answer({
+      toolName: "ask",
+      input: ask,
+      details: { customInput: "Please request the edit against the target repository." },
+      isError: false,
+    });
+
+    const retry = await instance.handler(event, context(repository));
+    expect(retry).toMatchObject({ reason: expect.stringContaining("previous confirmation was not approved") });
+    const secondRetry = await instance.handler(event, context(repository));
+    expect(secondRetry).toMatchObject({ reason: expect.stringContaining("previous confirmation was not approved") });
+    expect(instance.messages).toHaveLength(1);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
