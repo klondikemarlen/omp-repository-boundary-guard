@@ -38,10 +38,9 @@ export function githubHandoff(event: ToolCallEvent, cwd: string): RepositoryMuta
     write.target = remoteRepository(remote) ?? pushRepository(commandCwd, remote);
     write.targetUnresolved = !write.target;
   }
-  if (write.reviewThreadUnresolved) write.targetUnresolved = true;
   if (write.reviewThreadId && !write.targetUnresolved) {
     const threadRepository = reviewThreadRepository(write.reviewThreadId);
-    if (!threadRepository || write.target && write.target !== threadRepository) {
+    if (!threadRepository || (write.target && write.target !== threadRepository)) {
       write.targetUnresolved = true;
     } else {
       write.target = threadRepository;

@@ -6,5 +6,4 @@ export type GitHubWrite = {
   remote?: string;
   description?: string;
   reviewThreadId?: string;
-  reviewThreadUnresolved?: boolean;
 };

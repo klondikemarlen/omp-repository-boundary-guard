@@ -11,6 +11,8 @@ Opt-in OMP extension that offers a soft, best-guess warning when a recognized mu
 
 The guard asks only when it can resolve a supported mutation and identify a target different from the active repository. Same-repository mutations remain silent. Read-only operations, unknown or malformed operations, dynamic or ambiguous commands, unresolved paths, unresolved repositories, and missing checkout information pass through without an Ask. The underlying tool remains responsible for validating anything the guard cannot classify confidently.
 
+GraphQL `gh api` requests are conservatively target-resolved only for a single `resolveReviewThread` mutation; other GraphQL mutations remain unresolved and pass through.
+
 The active boundary is the invoking session's normalized GitHub `origin`, or its canonical Git root when no GitHub origin exists. Tool `cwd`, shell `cd … &&`, and Git `-C` help resolve a target, but never redefine the boundary. A different local checkout or resolved GitHub repository triggers one standard OMP Ask; one approval authorizes exactly one matching retry.
 
 ## Ask handoff
@@ -28,6 +30,8 @@ omp plugin install github:klondikemarlen/omp-repository-boundary-guard
 ```
 
 After installing or reinstalling, start a new OMP process (or reload its extensions) before retesting. Existing OMP processes retain extension modules loaded at startup.
+
+Approvals are held in memory only; a plugin reload does not carry an earlier approval into the new process.
 
 If `omp-github-write-guard` is installed from the historical package name, remove it before installing this replacement. Running both guards creates competing confirmation flows.
 

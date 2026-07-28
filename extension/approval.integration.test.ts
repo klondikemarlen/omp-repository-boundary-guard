@@ -250,3 +250,48 @@ test("does not repeat a confirmation after explicit rejection", async () => {
     rmSync(repository, { recursive: true, force: true });
   }
 });
+
+test("retries one approved external write after plugin reload", async () => {
+  const repository = checkout();
+  const event = { toolName: "bash", input: { command: `gh issue create --repo ${external} --title "Reloaded"` } };
+  try {
+    const first = guard();
+    expect(await first.handler(event, context(repository))).toMatchObject({ block: true });
+    const message = first.messages[0]!;
+    const start = message.indexOf("{");
+    const end = message.indexOf("}. If approved", start) + 1;
+    const localAsk = JSON.parse(message.slice(start, end)) as { questions: [{ question: string }] };
+    const externalQuestion = localAsk.questions[0].question
+      .split("\n")
+      .filter((line) => !line.startsWith("Current repository:") && !line.startsWith("Target repository:"))
+      .join("\n");
+
+    const reloaded = guard();
+    reloaded.answer({
+      toolName: "ask",
+      input: { questions: [{ id: "confirm_external_github_write", question: externalQuestion }] },
+      details: { selectedOptions: ["Approve"] },
+      isError: false,
+    });
+    expect(await reloaded.handler(event, context(repository))).toBeUndefined();
+    expect(await reloaded.handler(event, context(repository))).toMatchObject({ block: true });
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("does not carry an in-memory approval across plugin reload", async () => {
+  const repository = checkout();
+  const event = { toolName: "bash", input: { command: `gh issue create --repo ${external} --title "Not persisted"` } };
+  try {
+    const first = guard();
+    expect(await first.handler(event, context(repository))).toMatchObject({ block: true });
+    approve(first, "GitHub issue creation", external);
+
+    const reloaded = guard();
+    expect(await reloaded.handler(event, context(repository))).toMatchObject({ block: true });
+    expect(reloaded.messages).toHaveLength(1);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
