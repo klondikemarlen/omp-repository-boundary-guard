@@ -16,6 +16,9 @@ export function createRepositoryBoundaryGuard(): (pi: ExtensionAPI) => void {
 
       const authorizationResult = authorization.consume(handoff.fingerprint);
       if (authorizationResult === "authorized") return;
+      if (authorizationResult === "rejected") {
+        return { block: true, reason: `${reason} The previous confirmation was not approved; no duplicate confirmation was requested.` };
+      }
       const question = handoff.ask.questions[0].question;
       if (authorization.consumeExternal(question)) return;
       const authorizationDetail =

@@ -68,3 +68,31 @@ test("does not consume an external approval for a different command", () => {
   expect(state.consumeExternal(changed)).toBe(false);
   expect(state.consumeExternal(original)).toBe(true);
 });
+test("does not repeat a confirmation after a custom answer", () => {
+  const state = new AuthorizationState();
+  state.resetFor("/checkout");
+  state.begin("key", question);
+  state.record({
+    toolName: "ask",
+    input: { questions: [{ id: "confirm_repository_boundary_mutation", question }] },
+    details: { customInput: "Please request the edit against the target repository." },
+    isError: false,
+  });
+
+  expect(state.consume("key")).toBe("rejected");
+  expect(state.consume("key")).toBe("rejected");
+});
+
+test("keeps a pending confirmation after an unrelated ask", () => {
+  const state = new AuthorizationState();
+  state.resetFor("/checkout");
+  state.begin("key", question);
+  state.record({
+    toolName: "ask",
+    input: { questions: [{ id: "other_question", question: "Unrelated question?" }] },
+    details: { customInput: "Answer" },
+    isError: false,
+  });
+
+  expect(state.begin("next", question)).toBe(false);
+});
