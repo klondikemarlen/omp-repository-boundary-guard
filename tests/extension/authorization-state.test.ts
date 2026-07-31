@@ -31,6 +31,26 @@ test("distinguishes and clears a mismatched approval", () => {
   expect(state.consume("key")).toBe("missing");
 });
 
+test("clears a pending confirmation after a mismatched known approval", () => {
+  const state = new AuthorizationState();
+  state.resetFor("/checkout");
+  state.begin("key", question);
+  state.record({
+    toolName: "ask",
+    input: {
+      questions: [{
+        id: "confirm_repository_boundary_mutation",
+        question: "Allow one git push to elsewhere/other-example?",
+      }],
+    },
+    details: { selectedOptions: ["Approve"] },
+    isError: false,
+  });
+
+  expect(state.consume("key")).toBe("mismatched");
+  expect(state.begin("next", question)).toBe(true);
+});
+
 test("clears pending authorization when the checkout changes", () => {
   const state = new AuthorizationState();
   state.resetFor("/checkout");
