@@ -16,6 +16,36 @@ test("does not reissue a pending confirmation", async () => {
   }
 });
 
+test("reissues after an approved mismatched confirmation clears pending state", async () => {
+  const repository = checkout();
+  const event = { toolName: "bash", input: { command: `gh issue create --repo ${external} --title "Mismatched approval"` } };
+  try {
+    const instance = guard();
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+    const message = instance.messages[0]!;
+    const start = message.indexOf("{");
+    const end = message.indexOf("}. If approved", start) + 1;
+    const ask = JSON.parse(message.slice(start, end)) as { questions: [{ question: string; id: string }] };
+    ask.questions[0].question += "\nUnexpected detail";
+    instance.answer({
+      toolName: "ask",
+      input: ask,
+      details: { selectedOptions: ["Approve"] },
+      isError: false,
+    });
+
+    const retry = await instance.handler(event, context(repository));
+    expect(retry).toMatchObject({
+      block: true,
+      reason: expect.stringContaining("does not match this exact retry"),
+    });
+    expect(retry).not.toMatchObject({ reason: expect.stringContaining("confirmation is already pending") });
+    expect(instance.messages).toHaveLength(2);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("composes with an already-approved external GitHub gate", async () => {
   const repository = checkout();
   try {

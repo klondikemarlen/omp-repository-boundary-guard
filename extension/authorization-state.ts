@@ -15,6 +15,7 @@ export class AuthorizationState {
   #pending: { key: string; question: string } | undefined;
   #authorizedKey: string | undefined;
   #rejectedKey: string | undefined;
+  #mismatchedKey: string | undefined;
   #externalQuestion: string | undefined;
   #sessionDirectory: string | undefined;
 
@@ -28,6 +29,7 @@ export class AuthorizationState {
     this.#pending = undefined;
     this.#authorizedKey = undefined;
     this.#rejectedKey = undefined;
+    this.#mismatchedKey = undefined;
     this.#externalQuestion = undefined;
   }
 
@@ -43,8 +45,15 @@ export class AuthorizationState {
       if (externalQuestion) this.#externalQuestion = externalQuestion;
       return;
     }
-    if (submittedQuestion !== pending.question &&
-      !(externalQuestion && isApprovedExternalConfirmation(event.input, event.details, pending.question))) return;
+    const externalApprovalMatches =
+      externalQuestion && isApprovedExternalConfirmation(event.input, event.details, pending.question);
+    if (submittedQuestion !== pending.question && !externalApprovalMatches) {
+      if (submittedQuestion !== undefined || externalQuestion !== undefined) {
+        this.#pending = undefined;
+        this.#mismatchedKey = pending.key;
+      }
+      return;
+    }
 
     this.#pending = undefined;
     if (isApprovedConfirmation(event.input, event.details, pending.question)) {
@@ -61,6 +70,9 @@ export class AuthorizationState {
     this.#authorizedKey = undefined;
     if (authorizedKey) return authorizedKey === key ? "authorized" : "mismatched";
 
+    const mismatchedKey = this.#mismatchedKey;
+    this.#mismatchedKey = undefined;
+    if (mismatchedKey === key) return "mismatched";
     const rejectedKey = this.#rejectedKey;
     if (rejectedKey === key) return "rejected";
     this.#rejectedKey = undefined;
@@ -94,6 +106,7 @@ export class AuthorizationState {
   begin(key: string, question: string): boolean {
     if (this.#pending) return false;
     this.#rejectedKey = undefined;
+    this.#mismatchedKey = undefined;
     this.#pending = { key, question };
     return true;
   }
