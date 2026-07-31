@@ -8,6 +8,8 @@ export type {
   ToolInput,
   ToolResultEvent,
   ToolResultHandler,
+  TurnStartEvent,
+  TurnStartHandler,
 } from "./extension/contract.ts";
 export { currentCheckoutRepository } from "./git/current-checkout.ts";
 export { guardDecision, type GuardDecision } from "./guard/decision.ts";

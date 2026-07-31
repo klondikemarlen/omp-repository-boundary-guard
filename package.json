@@ -1,6 +1,6 @@
 {
   "name": "omp-repository-boundary-guard",
-  "version": "1.5.9",
+  "version": "1.6.0",
   "description": "Opt-in OMP advisory guard for confidently resolved mutations outside the active repository boundary.",
   "type": "module",
   "scripts": {

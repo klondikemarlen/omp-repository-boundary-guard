@@ -1,3 +1,4 @@
+import type { RepositoryMutationHandoff } from "../guard/ask.ts";
 import type { ToolResultEvent } from "./contract.ts";
 import {
   approvedExternalQuestion,
@@ -10,12 +11,21 @@ import {
 import { confirmationQuestionId } from "../guard/confirmation-question.ts";
 
 export type AuthorizationResult = "authorized" | "missing" | "mismatched" | "rejected";
+type AuthorizationHandoff = Extract<RepositoryMutationHandoff, { decision: "ask" }>;
 
 export class AuthorizationState {
-  #pending: { key: string; question: string } | undefined;
-  #authorizedKey: string | undefined;
+  #pending: {
+    key: string;
+    question: string;
+    questionId: string;
+    identity?: string;
+    handoff?: AuthorizationHandoff;
+  } | undefined;
+  #authorized: { key: string; identity?: string; handoff?: AuthorizationHandoff } | undefined;
   #rejectedKey: string | undefined;
+  #rejectedCategory: AuthorizationHandoff["category"] | undefined;
   #mismatchedKey: string | undefined;
+  #mismatchedCategory: AuthorizationHandoff["category"] | undefined;
   #externalQuestion: string | undefined;
   #sessionDirectory: string | undefined;
 
@@ -27,10 +37,25 @@ export class AuthorizationState {
     if (this.#sessionDirectory === directory) return;
     this.#sessionDirectory = directory;
     this.#pending = undefined;
-    this.#authorizedKey = undefined;
+    this.#authorized = undefined;
     this.#rejectedKey = undefined;
+    this.#rejectedCategory = undefined;
     this.#mismatchedKey = undefined;
+    this.#mismatchedCategory = undefined;
     this.#externalQuestion = undefined;
+  }
+
+  resetTurn(): void {
+    if (this.#pending?.handoff?.category === "release") this.#pending = undefined;
+    if (this.#authorized?.handoff?.category === "release") this.#authorized = undefined;
+    if (this.#rejectedCategory === "release") {
+      this.#rejectedKey = undefined;
+      this.#rejectedCategory = undefined;
+    }
+    if (this.#mismatchedCategory === "release") {
+      this.#mismatchedKey = undefined;
+      this.#mismatchedCategory = undefined;
+    }
   }
 
   record(event: ToolResultEvent): void {
@@ -39,7 +64,7 @@ export class AuthorizationState {
     const pending = this.#pending;
     const externalQuestion = approvedExternalQuestion(event.input, event.details);
     const submittedQuestion =
-      submittedConfirmationQuestion(event.input, confirmationQuestionId) ??
+      (pending && submittedConfirmationQuestion(event.input, pending.questionId)) ??
       submittedConfirmationQuestion(event.input, externalConfirmationQuestionId);
     if (!pending) {
       if (externalQuestion) this.#externalQuestion = externalQuestion;
@@ -51,24 +76,32 @@ export class AuthorizationState {
       if (submittedQuestion !== undefined || externalQuestion !== undefined) {
         this.#pending = undefined;
         this.#mismatchedKey = pending.key;
+        this.#mismatchedCategory = pending.handoff?.category;
       }
       return;
     }
 
     this.#pending = undefined;
-    if (isApprovedConfirmation(event.input, event.details, pending.question)) {
-      this.#authorizedKey = pending.key;
+    if (isApprovedConfirmation(event.input, event.details, pending.question, pending.questionId)) {
+      this.#authorized = { key: pending.key, identity: pending.identity, handoff: pending.handoff };
     } else if (externalQuestion && isApprovedExternalConfirmation(event.input, event.details, pending.question)) {
       this.#externalQuestion = externalQuestion;
     } else {
       this.#rejectedKey = pending.key;
+      this.#rejectedCategory = pending.handoff?.category;
     }
   }
 
+  artifact(identity: string): RepositoryMutationHandoff | undefined {
+    if (this.#pending?.identity === identity) return this.#pending.handoff;
+    if (this.#authorized?.identity === identity) return this.#authorized.handoff;
+    return undefined;
+  }
+
   consume(key: string): AuthorizationResult {
-    const authorizedKey = this.#authorizedKey;
-    this.#authorizedKey = undefined;
-    if (authorizedKey) return authorizedKey === key ? "authorized" : "mismatched";
+    const authorized = this.#authorized;
+    this.#authorized = undefined;
+    if (authorized) return authorized.key === key ? "authorized" : "mismatched";
 
     const mismatchedKey = this.#mismatchedKey;
     this.#mismatchedKey = undefined;
@@ -103,11 +136,17 @@ export class AuthorizationState {
     return true;
   }
 
-  begin(key: string, question: string): boolean {
+  begin(
+    key: string,
+    question: string,
+    identity?: string,
+    handoff?: AuthorizationHandoff,
+    questionId = confirmationQuestionId,
+  ): boolean {
     if (this.#pending) return false;
     this.#rejectedKey = undefined;
     this.#mismatchedKey = undefined;
-    this.#pending = { key, question };
+    this.#pending = { key, question, questionId, identity, handoff };
     return true;
   }
 }
