@@ -3,6 +3,7 @@ import { authorizationKey } from "./authorization-key.ts";
 import {
   confirmationQuestion,
   confirmationQuestionId,
+  releaseConfirmationQuestionId,
   type BoundaryCategory,
 } from "./confirmation-question.ts";
 
@@ -38,6 +39,7 @@ export function askHandoff(
   description?: string,
 ): Extract<RepositoryMutationHandoff, { decision: "ask" }> {
   const question = confirmationQuestion(action, target, event.input, description, currentRepository, category);
+  const questionId = category === "release" ? releaseConfirmationQuestionId : confirmationQuestionId;
   return {
     decision: "ask",
     action,
@@ -47,7 +49,7 @@ export function askHandoff(
     fingerprint: authorizationKey(action, target, event.input, context),
     ask: {
       questions: [{
-        id: confirmationQuestionId,
+        id: questionId,
         question,
         options: [
           { label: "Approve", description: `Allow exactly this ${action} to ${target} once.`, preview: null },

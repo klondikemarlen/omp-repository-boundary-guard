@@ -32,6 +32,11 @@ omp plugin install github:klondikemarlen/omp-repository-boundary-guard
 After installing or reinstalling, start a new OMP process (or reload its extensions) before retesting. Existing OMP processes retain extension modules loaded at startup.
 
 Approvals are held in memory only; a plugin reload does not carry an earlier approval into the new process.
+The blocked handoff is cached in memory for the pending confirmation and one exact retry. The cache key excludes only OMP's per-call intent; any mutation input change, checkout change, rejection, or plugin reload discards or bypasses the artifact and requires a new confirmation. No prompt artifact is written to disk or retained across runs. The baseline path rebuilt the canonical handoff on retry; the integration tests cover the optimized single-handoff path and changed-retry rejection.
+
+Release, deploy, publish, and promote commands—including repository wrappers, package scripts, nested shell commands, and GitHub release writes—require their own fresh exact Ask in a current OMP turn. The guard reports the full blocked command and blocks without UI. Release pending/approved state is cleared at OMP `turn_start`; ordinary repository-boundary state keeps its existing lifecycle. Only a guard-internal delegated call carrying an in-memory one-shot capability bypasses this check; ordinary command fields, environment variables, and flags cannot.
+
+The project keeps the `omp-repository-boundary-guard` name. The active normalized repository/root remains the boundary description, so a configurable description would add a second policy without expanding the supported boundary model. Confirmation wording therefore names the resolved repository or checkout directly.
 
 If `omp-github-write-guard` is installed from the historical package name, remove it before installing this replacement. Running both guards creates competing confirmation flows.
 

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 
-import { createRepositoryBoundaryGuard, type ToolCallHandler } from "../../index.ts";
+import { createRepositoryBoundaryGuard, type ToolCallHandler, type TurnStartHandler } from "../../index.ts";
 
 export const current = "klondikemarlen/omp-repository-boundary-guard";
 export const external = "elsewhere/example";
@@ -10,21 +10,29 @@ export const confirmationId = "confirm_repository_boundary_mutation";
 export type Guard = {
   handler: ToolCallHandler;
   answer(event: { toolName: string; input: Record<string, unknown>; details: unknown; isError: boolean }): void;
+  turnStart(): void;
   messages: string[];
 };
 
 export function guard(): Guard {
   let handler: ToolCallHandler | undefined;
   let resultHandler: Guard["answer"] | undefined;
+  let turnStartHandler: TurnStartHandler | undefined;
   const messages: string[] = [];
   createRepositoryBoundaryGuard()({
-    on: ((event: string, registered: ToolCallHandler | Guard["answer"]) => {
+    on: ((event: string, registered: ToolCallHandler | Guard["answer"] | TurnStartHandler) => {
       if (event === "tool_call") handler = registered as ToolCallHandler;
+      else if (event === "turn_start") turnStartHandler = registered as TurnStartHandler;
       else resultHandler = registered as Guard["answer"];
     }) as never,
     sendUserMessage: (message) => messages.push(message),
   });
-  return { handler: handler!, answer: (event) => resultHandler!(event), messages };
+  return {
+    handler: handler!,
+    answer: (event) => resultHandler!(event),
+    turnStart: () => turnStartHandler!({}),
+    messages,
+  };
 }
 
 export function checkout(remote: string | null = `https://github.com/${current}.git`) {

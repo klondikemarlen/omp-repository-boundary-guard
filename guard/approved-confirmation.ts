@@ -60,7 +60,12 @@ export function isEquivalentIssueCreationApproval(storedQuestion: string, expect
     /(?:--method(?:=|\s+)POST|-X\s+POST)(?:\s|$)/i.test(command);
 }
 
-export function isApprovedConfirmation(input: ToolInput, details: unknown, expectedQuestion: string): boolean {
+export function isApprovedConfirmation(
+  input: ToolInput,
+  details: unknown,
+  expectedQuestion: string,
+  questionId = confirmationQuestionId,
+): boolean {
   const questions = input.questions;
   if (!Array.isArray(questions) || questions.length !== 1) return false;
 
@@ -70,7 +75,7 @@ export function isApprovedConfirmation(input: ToolInput, details: unknown, expec
     question !== null &&
     "id" in question &&
     "question" in question &&
-    question.id === confirmationQuestionId &&
+    question.id === questionId &&
     question.question === expectedQuestion &&
     typeof details === "object" &&
     details !== null &&

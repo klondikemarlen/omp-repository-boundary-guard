@@ -11,6 +11,8 @@ export type ToolResultEvent = {
 
 export type ToolCallResult = { block: true; reason: string } | undefined;
 
+export type TurnStartEvent = { turnIndex?: number };
+export type TurnStartHandler = (event: TurnStartEvent) => void;
 export type HookContext = { cwd: string; hasUI?: boolean };
 
 export type ToolCallHandler = (
@@ -23,5 +25,6 @@ export type ToolResultHandler = (event: ToolResultEvent, context: HookContext) =
 export type ExtensionAPI = {
   on(event: "tool_call", handler: ToolCallHandler): void;
   on(event: "tool_result", handler: ToolResultHandler): void;
+  on(event: "turn_start", handler: TurnStartHandler): void;
   sendUserMessage(content: string, options: { deliverAs: "steer" }): void;
 };
