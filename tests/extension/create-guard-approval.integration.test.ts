@@ -46,6 +46,30 @@ test("reissues after an approved mismatched confirmation clears pending state", 
   }
 });
 
+test("executes one exact approved issue creation retry", async () => {
+  const repository = checkout();
+  const event = { toolName: "bash", input: { command: `gh issue create --repo ${external} --title "Approved locally"` } };
+  try {
+    const instance = guard();
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+    const message = instance.messages[0]!;
+    const start = message.indexOf("{");
+    const end = message.indexOf("}. If approved", start) + 1;
+    const ask = JSON.parse(message.slice(start, end)) as Record<string, unknown>;
+    instance.answer({
+      toolName: "ask",
+      input: ask,
+      details: { selectedOptions: ["Approve"] },
+      isError: false,
+    });
+
+    expect(await instance.handler(event, context(repository))).toBeUndefined();
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("composes with an already-approved external GitHub gate", async () => {
   const repository = checkout();
   try {
