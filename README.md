@@ -36,7 +36,14 @@ The blocked handoff is cached in memory for the pending confirmation and one exa
 
 Release, deploy, publish, and promote commands—including repository wrappers, package scripts, nested shell commands, and GitHub release writes—are soft-boundary checks. They report the full command and request the exact Ask when UI is available; without UI, the underlying operation proceeds. Release pending/approved state is cleared at OMP `turn_start`; ordinary boundary state keeps its existing lifecycle. Only a guard-internal delegated call carrying an in-memory one-shot capability bypasses the interactive check; ordinary command fields, environment variables, and flags cannot.
 
-The next boundary-policy phase is tracked in issue #153: long positive/inside and negative/outside descriptions will compile into reviewed policy, while built-in deterministic adapters remain the safety floor. Uncertain low-risk cases may proceed with advisory recording; high-risk or likely outside cases may trigger the exact Ask. Resolved cases never silently broaden authorization.
+An optional reviewed soft-boundary policy can be activated with `OMP_SOFT_BOUNDARY_POLICY` containing JSON `{ "name": "...", "positive": "...", "negative": "..." }` and `OMP_SOFT_BOUNDARY_POLICY_REVIEWED` set to the compiled policy fingerprint. Inspect the compiled output before copying its `sourceFingerprint`; an edited source or mismatched fingerprint stays inactive. With an active policy, built-in deterministic adapters remain the safety floor, the optional `@smol` classifier is advisory, low-risk uncertainty proceeds with in-memory evidence, and high-risk or likely outside cases use the exact Ask. Model, UI, parser, and guard failures follow the configured `allow-and-record` behavior. Resolved cases never silently broaden authorization.
+
+From the plugin checkout or its installed package directory (for example `~/.omp/plugins/node_modules/omp-soft-boundary-guard`), compute the reviewed fingerprint after inspecting the compiled policy:
+
+```bash
+export OMP_SOFT_BOUNDARY_POLICY='{"name":"Customer repository work","positive":"active checkout, source, tests, docs","negative":"other checkouts, production targets, credentials, secrets"}'
+export OMP_SOFT_BOUNDARY_POLICY_REVIEWED="$(bun -e 'const { compileBoundaryPolicy } = await import("./index.ts"); console.log(compileBoundaryPolicy(JSON.parse(process.env.OMP_SOFT_BOUNDARY_POLICY)).sourceFingerprint)')"
+```
 
 If `omp-github-write-guard` is installed from the historical package name, remove it before installing this replacement. If `omp-repository-boundary-guard` is installed, remove it before installing this package; running both creates competing confirmation flows.
 
