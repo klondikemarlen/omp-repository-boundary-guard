@@ -20,7 +20,7 @@ import {
 
 test("keeps same-origin GitHub writes inside a worktree", async () => {
   const repository = checkout();
-  const worktree = `/tmp/omp-repository-boundary-guard-${crypto.randomUUID()}`;
+  const worktree = `/tmp/omp-soft-boundary-guard-${crypto.randomUUID()}`;
   const otherCheckout = checkout(`git@github.com:${external}.git`);
   try {
     execFileSync("git", ["-C", repository, "-c", "user.name=Guard", "-c", "user.email=guard@example.test", "commit", "--allow-empty", "-m", "initial"]);
@@ -90,7 +90,7 @@ test("guards cross-repository pull-request comments", async () => {
 
 test("passes temporary body files without a boundary prompt", async () => {
   const repository = checkout();
-  const command = "gh issue create --body-file /tmp/omp-repository-boundary-guard-issue.md";
+  const command = "gh issue create --body-file /tmp/omp-soft-boundary-guard-issue.md";
   try {
     expect(repositoryMutationHandoff({ toolName: "bash", input: { command } }, repository)).toMatchObject({
       decision: "allow",
@@ -133,7 +133,7 @@ test("ignores repository-shaped text in an ANSI-C body", async () => {
 test("anchors GitHub mutation authorization to the active checkout", () => {
   const repository = checkout();
   const otherCheckout = checkout(`git@github.com:${external}.git`);
-  const unresolved = `/tmp/omp-repository-boundary-guard-${crypto.randomUUID()}`;
+  const unresolved = `/tmp/omp-soft-boundary-guard-${crypto.randomUUID()}`;
   mkdirSync(unresolved);
   try {
     const otherFromRepository = relative(repository, otherCheckout);
@@ -426,7 +426,7 @@ test("permits approved target-explicit pull request and issue mutations", async 
 });
 
 test("passes targetless pull request mutations outside a GitHub checkout", () => {
-  const unresolved = `/tmp/omp-repository-boundary-guard-${crypto.randomUUID()}`;
+  const unresolved = `/tmp/omp-soft-boundary-guard-${crypto.randomUUID()}`;
   mkdirSync(unresolved);
   try {
     expect(

@@ -17,11 +17,7 @@ export function createRepositoryBoundaryGuard(): (pi: ExtensionAPI) => void {
       const reason = handoff.category === "release"
         ? `Blocked ${handoff.action} targeting ${handoff.target}: confirmation is required. Command: ${event.input.command ?? "unavailable"}.`
         : `Blocked ${handoff.action} targeting ${handoff.target}: confirmation is required.`;
-      if (!context.hasUI) {
-        return handoff.category === "release"
-          ? { block: true, reason: `${reason} Interactive confirmation is required.` }
-          : undefined;
-      }
+      if (!context.hasUI) return;
 
       const authorizationResult = authorization.consume(handoff.fingerprint);
       if (authorizationResult === "authorized") return;

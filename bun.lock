@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "omp-repository-boundary-guard",
+      "name": "omp-soft-boundary-guard",
       "dependencies": {
         "shell-quote": "^1.10.0",
       },

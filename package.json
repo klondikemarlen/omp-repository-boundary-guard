@@ -1,18 +1,18 @@
 {
-  "name": "omp-repository-boundary-guard",
-  "version": "1.6.0",
-  "description": "Opt-in OMP advisory guard for confidently resolved mutations outside the active repository boundary.",
+  "name": "omp-soft-boundary-guard",
+  "version": "1.7.0",
+  "description": "Opt-in OMP soft boundary guard with deterministic adapters and advisory confirmation for uncertain writes.",
   "type": "module",
   "scripts": {
     "test": "bun test",
     "release:check": "bun run scripts/release-check.ts && bun node_modules/typescript/bin/tsc --noEmit && bun test",
     "handoff": "bun run bin/repository-mutation-handoff.ts",
-    "reinstall": "omp plugin install github:klondikemarlen/omp-repository-boundary-guard"
+    "reinstall": "omp plugin install github:klondikemarlen/omp-soft-boundary-guard"
   },
-  "keywords": ["omp-plugin", "repository-boundary", "safety"],
+  "keywords": ["omp-plugin", "soft-boundary", "boundary-guard", "safety"],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/klondikemarlen/omp-repository-boundary-guard.git"
+    "url": "git+https://github.com/klondikemarlen/omp-soft-boundary-guard.git"
   },
   "omp": {
     "extensions": ["./index.ts"]

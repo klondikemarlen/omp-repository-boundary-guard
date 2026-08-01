@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 
 import { createRepositoryBoundaryGuard, type ToolCallHandler, type TurnStartHandler } from "../../index.ts";
 
-export const current = "klondikemarlen/omp-repository-boundary-guard";
+export const current = "klondikemarlen/omp-soft-boundary-guard";
 export const external = "elsewhere/example";
 export const confirmationId = "confirm_repository_boundary_mutation";
 
@@ -36,7 +36,7 @@ export function guard(): Guard {
 }
 
 export function checkout(remote: string | null = `https://github.com/${current}.git`) {
-  const directory = `/tmp/omp-repository-boundary-guard-${crypto.randomUUID()}`;
+  const directory = `/tmp/omp-soft-boundary-guard-${crypto.randomUUID()}`;
   mkdirSync(directory, { recursive: true });
   execFileSync("git", ["-C", directory, "init", "--quiet"]);
   if (remote) execFileSync("git", ["-C", directory, "remote", "add", "origin", remote]);
