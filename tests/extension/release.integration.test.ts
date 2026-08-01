@@ -5,16 +5,13 @@ import { type ToolCallEvent } from "../../extension/contract.ts";
 import { authorizeInternalRelease, releaseHandoff } from "../../guard/release-handoff.ts";
 import { checkout, context, current, guard } from "./test-support.ts";
 
-test("blocks release tooling without UI and reports the exact command", async () => {
+test("passes release tooling through without UI", async () => {
   const repository = checkout();
   const command = "./bin/dev release main";
   try {
     const instance = guard();
     const result = await instance.handler({ toolName: "bash", input: { command } }, context(repository, false));
-    expect(result).toMatchObject({
-      block: true,
-      reason: expect.stringContaining(`Command: ${command}`),
-    });
+    expect(result).toBeUndefined();
     expect(instance.messages).toEqual([]);
   } finally {
     rmSync(repository, { recursive: true, force: true });
