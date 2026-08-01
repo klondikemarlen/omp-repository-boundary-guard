@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 
-import { createRepositoryBoundaryGuard, type ToolCallHandler, type TurnStartHandler } from "../../index.ts";
+import { createRepositoryBoundaryGuard, type BoundaryGuardOptions, type ToolCallHandler, type TurnStartHandler } from "../../index.ts";
 
 export const current = "klondikemarlen/omp-soft-boundary-guard";
 export const external = "elsewhere/example";
@@ -14,12 +14,12 @@ export type Guard = {
   messages: string[];
 };
 
-export function guard(): Guard {
+export function guard(options?: BoundaryGuardOptions): Guard {
   let handler: ToolCallHandler | undefined;
   let resultHandler: Guard["answer"] | undefined;
   let turnStartHandler: TurnStartHandler | undefined;
   const messages: string[] = [];
-  createRepositoryBoundaryGuard()({
+  createRepositoryBoundaryGuard(options)({
     on: ((event: string, registered: ToolCallHandler | Guard["answer"] | TurnStartHandler) => {
       if (event === "tool_call") handler = registered as ToolCallHandler;
       else if (event === "turn_start") turnStartHandler = registered as TurnStartHandler;

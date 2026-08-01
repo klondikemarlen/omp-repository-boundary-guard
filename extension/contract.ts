@@ -1,3 +1,7 @@
+import type { BoundaryClassifier } from "../boundary/classifier.ts";
+import type { ActiveBoundaryPolicy } from "../boundary/policy.ts";
+import type { RuntimeContext } from "../boundary/omp-classifier.ts";
+
 export type ToolInput = Record<string, unknown>;
 
 export type ToolCallEvent = { toolName: string; input: ToolInput };
@@ -13,7 +17,12 @@ export type ToolCallResult = { block: true; reason: string } | undefined;
 
 export type TurnStartEvent = { turnIndex?: number };
 export type TurnStartHandler = (event: TurnStartEvent) => void;
-export type HookContext = { cwd: string; hasUI?: boolean };
+export type HookContext = RuntimeContext & {
+  cwd: string;
+  hasUI?: boolean;
+  boundaryPolicy?: ActiveBoundaryPolicy;
+  boundaryClassifier?: BoundaryClassifier;
+};
 
 export type ToolCallHandler = (
   event: ToolCallEvent,
