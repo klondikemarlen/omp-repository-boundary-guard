@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { releaseCommand } from "../../shell/release-command.ts";
+import { releaseCommand, releaseTarget } from "../../shell/release-command.ts";
 
 test("recognizes direct release and deploy commands", () => {
   for (const command of ["release main", "./bin/dev release main", "./scripts/deploy production", "npm publish"]) {
@@ -18,6 +18,24 @@ test("recognizes package scripts, wrappers, and nested shell commands", () => {
   ]) {
     expect(releaseCommand(command)).toBe(command);
   }
+});
+
+test("resolves nested explicit release targets", () => {
+  expect(releaseTarget("bash -e -c 'npm run release -- --repo Owner/Repository'")).toEqual({
+    repository: "owner/repository",
+    unresolved: false,
+  });
+});
+
+test("resolves targets at the supported shell nesting limit", () => {
+  expect(releaseTarget("bash -c 'bash -c \"npm run release -- --repo Owner/Repository\"'")).toEqual({
+    repository: "owner/repository",
+    unresolved: false,
+  });
+});
+
+test("marks malformed release targets unresolved", () => {
+  expect(releaseTarget('npm run release -- --repo "$TARGET"')).toEqual({ unresolved: true });
 });
 
 test("does not classify read-only checks as release tooling", () => {
