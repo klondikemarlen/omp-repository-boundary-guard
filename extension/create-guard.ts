@@ -24,14 +24,19 @@ function advisoryHandoff(
   cwd: string,
 ): Extract<RepositoryMutationHandoff, { decision: "ask" }> {
   const action = handoff.action ?? "write";
-  const category = action === "git push" ? "git" : action.startsWith("GitHub") ? "github" : "local";
+  const category = action === "release/deploy"
+    ? "release"
+    : action === "git push"
+    ? "git"
+    : action.startsWith("GitHub")
+    ? "github"
+    : "local";
   return askHandoff(action, handoff.target ?? "unresolved target", event, cwd, category, handoff.currentRepository);
 }
 
 export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}): (pi: ExtensionAPI) => void {
   return (pi) => {
     const authorization = new AuthorizationState();
-    pi.on("turn_start", () => authorization.resetTurn());
     pi.on("tool_result", (event) => authorization.record(event));
     pi.on("tool_call", async (event, context): Promise<ToolCallResult> => {
       const configuredPolicy = context.boundaryPolicy ?? options.policy;
@@ -41,7 +46,12 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
         authorization.resetFor(context.cwd);
         const identity = retryIdentity(event.toolName, event.input, context.cwd);
         const configuredClassifier = context.boundaryClassifier ?? options.classifier ?? (activePolicy ? createOmpBoundaryClassifier(context) : undefined);
-        handoff = authorization.artifact(identity) ?? repositoryMutationHandoff(event, context.cwd);
+        const resolvedHandoff = repositoryMutationHandoff(event, context.cwd);
+        const cachedHandoff = authorization.artifact(identity);
+        handoff = cachedHandoff?.decision === "ask" && resolvedHandoff.decision === "ask" &&
+          cachedHandoff.fingerprint === resolvedHandoff.fingerprint
+          ? cachedHandoff
+          : resolvedHandoff;
 
         if (handoff.decision === "allow" && activePolicy && configuredClassifier && handoff.action) {
           let classification: BoundaryClassificationResult | undefined;

@@ -45,18 +45,6 @@ export class AuthorizationState {
     this.#externalQuestion = undefined;
   }
 
-  resetTurn(): void {
-    if (this.#pending?.handoff?.category === "release") this.#pending = undefined;
-    if (this.#authorized?.handoff?.category === "release") this.#authorized = undefined;
-    if (this.#rejectedCategory === "release") {
-      this.#rejectedKey = undefined;
-      this.#rejectedCategory = undefined;
-    }
-    if (this.#mismatchedCategory === "release") {
-      this.#mismatchedKey = undefined;
-      this.#mismatchedCategory = undefined;
-    }
-  }
 
   record(event: ToolResultEvent): void {
     if (event.toolName !== "ask" || event.isError) return;
@@ -100,8 +88,12 @@ export class AuthorizationState {
 
   consume(key: string): AuthorizationResult {
     const authorized = this.#authorized;
-    this.#authorized = undefined;
-    if (authorized) return authorized.key === key ? "authorized" : "mismatched";
+    if (authorized?.key === key) {
+      this.#authorized = undefined;
+      this.#pending = undefined;
+      return "authorized";
+    }
+    if (authorized) return "mismatched";
 
     const mismatchedKey = this.#mismatchedKey;
     this.#mismatchedKey = undefined;

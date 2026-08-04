@@ -11,5 +11,6 @@ export function repositoryMutationHandoff(event: ToolCallEvent, cwd: string): Re
   if (release.decision !== "allow") return release;
   const github = githubHandoff(event, cwd);
   if (github.decision !== "allow") return github;
+  if (release.action) return release;
   return localHandoff(event, cwd) ?? github;
 }
