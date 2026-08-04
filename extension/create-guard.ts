@@ -53,7 +53,7 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
           ? cachedHandoff
           : resolvedHandoff;
 
-        if (handoff.decision === "allow" && activePolicy && configuredClassifier && handoff.action) {
+        if (handoff.decision === "allow" && handoff.action !== "release/deploy" && activePolicy && configuredClassifier && handoff.action) {
           let classification: BoundaryClassificationResult | undefined;
           try {
             classification = await configuredClassifier({
