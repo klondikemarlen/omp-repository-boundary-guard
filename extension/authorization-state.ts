@@ -93,7 +93,10 @@ export class AuthorizationState {
       this.#pending = undefined;
       return "authorized";
     }
-    if (authorized) return "mismatched";
+    if (authorized) {
+      if (authorized.handoff?.category !== "release") this.#authorized = undefined;
+      return "mismatched";
+    }
 
     const mismatchedKey = this.#mismatchedKey;
     this.#mismatchedKey = undefined;
