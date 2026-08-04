@@ -23,9 +23,7 @@ export class AuthorizationState {
   } | undefined;
   #authorized: { key: string; identity?: string; handoff?: AuthorizationHandoff } | undefined;
   #rejectedKey: string | undefined;
-  #rejectedCategory: AuthorizationHandoff["category"] | undefined;
   #mismatchedKey: string | undefined;
-  #mismatchedCategory: AuthorizationHandoff["category"] | undefined;
   #externalQuestion: string | undefined;
   #sessionDirectory: string | undefined;
 
@@ -39,9 +37,7 @@ export class AuthorizationState {
     this.#pending = undefined;
     this.#authorized = undefined;
     this.#rejectedKey = undefined;
-    this.#rejectedCategory = undefined;
     this.#mismatchedKey = undefined;
-    this.#mismatchedCategory = undefined;
     this.#externalQuestion = undefined;
   }
 
@@ -64,7 +60,6 @@ export class AuthorizationState {
       if (submittedQuestion !== undefined || externalQuestion !== undefined) {
         this.#pending = undefined;
         this.#mismatchedKey = pending.key;
-        this.#mismatchedCategory = pending.handoff?.category;
       }
       return;
     }
@@ -76,7 +71,6 @@ export class AuthorizationState {
       this.#externalQuestion = externalQuestion;
     } else {
       this.#rejectedKey = pending.key;
-      this.#rejectedCategory = pending.handoff?.category;
     }
   }
 
