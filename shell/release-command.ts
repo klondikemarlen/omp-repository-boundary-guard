@@ -9,13 +9,15 @@ const PACKAGE_PUBLISHERS: Record<string, true> = { npm: true, pnpm: true, yarn: 
 const GH_RELEASE_ACTIONS: Record<string, true> = { create: true, edit: true, delete: true, upload: true, publish: true };
 const SHELLS: Record<string, true> = { bash: true, sh: true, zsh: true, dash: true, fish: true };
 
+const MAX_NESTED_SHELL_DEPTH = 2;
+
 function isReleaseWrapper(executable: string): boolean {
   const normalized = executable.replaceAll("\\", "/");
   return /(?:^|\/)(?:bin\/(?:dev|release|deploy)|scripts\/(?:release|deploy)(?:\.[A-Za-z0-9_-]+)?)$/.test(normalized);
 }
 
 function isReleaseCommand(command: string, depth: number): boolean {
-  if (depth > 2) return false;
+  if (depth > MAX_NESTED_SHELL_DEPTH) return false;
   for (const { words } of shellCommandSegments(command)) {
     const index = executableIndex(words);
     const executable = words[index];
@@ -44,7 +46,7 @@ function explicitReleaseTarget(command: string, depth = 0): string | null | unde
     const executable = words[index];
     const args = words.slice(index + 1).filter((word): word is string => typeof word === "string");
     const commandIndex = args.indexOf("-c");
-    if (depth < 2 && typeof executable === "string" && SHELLS[basename(executable)] && commandIndex >= 0) {
+    if (depth < MAX_NESTED_SHELL_DEPTH && typeof executable === "string" && SHELLS[basename(executable)] && commandIndex >= 0) {
       const nestedTarget = args[commandIndex + 1] ? explicitReleaseTarget(args[commandIndex + 1], depth + 1) : null;
       if (nestedTarget === null || (target && nestedTarget && target !== nestedTarget)) return null;
       target ??= nestedTarget;

@@ -27,6 +27,13 @@ test("resolves nested explicit release targets", () => {
   });
 });
 
+test("resolves targets at the supported shell nesting limit", () => {
+  expect(releaseTarget("bash -c 'bash -c \"npm run release -- --repo Owner/Repository\"'")).toEqual({
+    repository: "owner/repository",
+    unresolved: false,
+  });
+});
+
 test("marks malformed release targets unresolved", () => {
   expect(releaseTarget('npm run release -- --repo "$TARGET"')).toEqual({ unresolved: true });
 });
