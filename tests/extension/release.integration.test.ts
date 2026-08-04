@@ -110,16 +110,33 @@ test("ignores repository flags outside a release command", () => {
   }
 });
 
-test("retains high-risk release approval through queued turn delivery", async () => {
+test("does not classify an owned release under an active policy", async () => {
   const repository = checkout();
   try {
+    let classified = false;
     const instance = guard({
       policy: highRiskPolicy,
-      classifier: async () => ({ classification: "outside", risk: "high", reason: "production target" }),
+      classifier: async () => {
+        classified = true;
+        return { classification: "outside", risk: "high", reason: "production target" };
+      },
     });
     const event = { toolName: "bash", input: { command: `npm run release -- --repo ${current}` } };
+    expect(await instance.handler(event, context(repository))).toBeUndefined();
+    expect(classified).toBeFalse();
+    expect(instance.messages).toEqual([]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("retains external release approval through queued turn delivery", async () => {
+  const repository = checkout(`https://github.com/${external}.git`);
+  try {
+    const instance = guard();
+    const event = { toolName: "bash", input: { command: "npm run release" } };
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
-    approve(instance, "release/deploy", current);
+    approve(instance, "release/deploy", external);
     instance.turnStart();
     expect(await instance.handler(event, context(repository))).toBeUndefined();
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
@@ -128,16 +145,13 @@ test("retains high-risk release approval through queued turn delivery", async ()
   }
 });
 
-test("keeps exact release approval after a changed command is blocked", async () => {
-  const repository = checkout();
+test("keeps exact external release approval after a changed command is blocked", async () => {
+  const repository = checkout(`https://github.com/${external}.git`);
   try {
-    const instance = guard({
-      policy: highRiskPolicy,
-      classifier: async () => ({ classification: "outside", risk: "high", reason: "production target" }),
-    });
+    const instance = guard();
     const event = { toolName: "bash", input: { command: "npm run release" } };
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
-    approve(instance, "release/deploy", current);
+    approve(instance, "release/deploy", external);
     expect(await instance.handler(
       { toolName: "bash", input: { command: "npm run release -- --dry-run" } },
       context(repository),
@@ -149,16 +163,13 @@ test("keeps exact release approval after a changed command is blocked", async ()
 });
 
 test("does not authorize release in a different checkout", async () => {
-  const repository = checkout();
-  const otherRepository = checkout(`https://github.com/${external}.git`);
+  const repository = checkout(`https://github.com/${external}.git`);
+  const otherRepository = checkout("https://github.com/elsewhere/another.git");
   try {
-    const instance = guard({
-      policy: highRiskPolicy,
-      classifier: async () => ({ classification: "outside", risk: "high", reason: "production target" }),
-    });
+    const instance = guard();
     const event = { toolName: "bash", input: { command: "npm run release" } };
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
-    approve(instance, "release/deploy", current);
+    approve(instance, "release/deploy", external);
     expect(await instance.handler(event, context(otherRepository))).toMatchObject({ block: true });
   } finally {
     rmSync(repository, { recursive: true, force: true });
@@ -167,16 +178,13 @@ test("does not authorize release in a different checkout", async () => {
 });
 
 test("does not authorize a changed origin in the same checkout", async () => {
-  const repository = checkout();
+  const repository = checkout(`https://github.com/${external}.git`);
   try {
-    const instance = guard({
-      policy: highRiskPolicy,
-      classifier: async () => ({ classification: "outside", risk: "high", reason: "production target" }),
-    });
+    const instance = guard();
     const event = { toolName: "bash", input: { command: "npm run release" } };
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
-    approve(instance, "release/deploy", current);
-    execFileSync("git", ["-C", repository, "remote", "set-url", "origin", `https://github.com/${external}.git`]);
+    approve(instance, "release/deploy", external);
+    execFileSync("git", ["-C", repository, "remote", "set-url", "origin", "https://github.com/elsewhere/another.git"]);
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
   } finally {
     rmSync(repository, { recursive: true, force: true });
