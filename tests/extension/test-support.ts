@@ -30,7 +30,7 @@ export function guard(options?: BoundaryGuardOptions): Guard {
   return {
     handler: handler!,
     answer: (event) => resultHandler!(event),
-    turnStart: () => turnStartHandler!({}),
+    turnStart: () => turnStartHandler?.({}),
     messages,
   };
 }

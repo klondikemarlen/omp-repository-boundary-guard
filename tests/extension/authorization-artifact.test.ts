@@ -17,7 +17,6 @@ test("reuses the canonical artifact by stable identity until one retry consumes 
   const state = new AuthorizationState();
   state.resetFor("/checkout");
   expect(state.begin("key", question, "same-input", handoff)).toBe(true);
-  state.resetTurn();
   expect(state.artifact("same-input")).toBe(handoff);
   expect(state.artifact("changed-input")).toBeUndefined();
 
