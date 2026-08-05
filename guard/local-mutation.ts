@@ -1,4 +1,5 @@
 import { lstatSync, readlinkSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -63,6 +64,13 @@ function canonicalTarget(path: string, cwd: string): string | undefined {
   }
 
   return undefined;
+}
+
+const TEMPORARY_DIRECTORY = canonicalTarget(tmpdir(), sep);
+
+function isTemporaryTarget(target: string): boolean {
+  return TEMPORARY_DIRECTORY !== undefined &&
+    (target === TEMPORARY_DIRECTORY || target.startsWith(`${TEMPORARY_DIRECTORY}${sep}`));
 }
 
 const REGISTERED_INTERNAL_TARGETS: Record<string, true> = {
@@ -175,6 +183,7 @@ export function localMutation(event: ToolCallEvent, sessionCwd: string): LocalMu
   const externalTargets = [
     ...new Set(
       targets.filter((target) => {
+        if (isTemporaryTarget(target)) return false;
         const targetBoundary = containingBoundary(target);
         if (!targetBoundary) return false;
         return targetBoundary !== boundary;

@@ -37,12 +37,16 @@ export function guard(options?: BoundaryGuardOptions): Guard {
   };
 }
 
-export function checkout(remote: string | null = `https://github.com/${current}.git`) {
-  const directory = `/tmp/omp-soft-boundary-guard-${crypto.randomUUID()}`;
+export function checkout(remote: string | null = `https://github.com/${current}.git`, root = "/tmp") {
+  const directory = `${root}/omp-soft-boundary-guard-${crypto.randomUUID()}`;
   mkdirSync(directory, { recursive: true });
   execFileSync("git", ["-C", directory, "init", "--quiet"]);
   if (remote) execFileSync("git", ["-C", directory, "remote", "add", "origin", remote]);
   return directory;
+}
+
+export function checkoutOutsideTemporaryDirectory(remote: string | null = `https://github.com/${current}.git`) {
+  return checkout(remote, process.cwd());
 }
 
 export function context(cwd: string, hasUI = true) {

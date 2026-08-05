@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { relative, resolve } from "node:path";
 
 import { currentCheckoutRepository } from "../../index.ts";
-import { approve, checkout, context, current, external, guard } from "../extension/test-support.ts";
+import { approve, checkout, checkoutOutsideTemporaryDirectory, context, current, external, guard } from "../extension/test-support.ts";
 
 test("resolves nested checkout origins", () => {
   const repository = checkout();
@@ -93,9 +94,43 @@ test("permits writes in the active repository", async () => {
   }
 });
 
+test("permits writes in temporary Git checkouts", async () => {
+  const repository = checkout();
+  const temporaryCheckout = checkout(`git@github.com:${external}.git`, tmpdir());
+  try {
+    const result = await guard().handler(
+      { toolName: "write", input: { path: `${temporaryCheckout}/inside.ts`, content: "export {};\n" } },
+      context(repository),
+    );
+    expect(result).toBeUndefined();
+  } finally {
+    rmSync(temporaryCheckout, { recursive: true, force: true });
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("asks before temporary symlink writes escape into another repository", async () => {
+  const repository = checkout();
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
+  const temporaryRoot = resolve(tmpdir(), `omp-soft-boundary-guard-${crypto.randomUUID()}`);
+  try {
+    mkdirSync(temporaryRoot);
+    symlinkSync(otherCheckout, `${temporaryRoot}/outside`);
+    const result = await guard().handler(
+      { toolName: "write", input: { path: `${temporaryRoot}/outside/created.ts`, content: "export {};\n" } },
+      context(repository),
+    );
+    expect(result).toMatchObject({ block: true });
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true });
+    rmSync(otherCheckout, { recursive: true, force: true });
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("retries an approved external write", async () => {
   const repository = checkout();
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   try {
     const instance = guard();
     const target = `${otherCheckout}/outside.ts`;
@@ -112,7 +147,7 @@ test("retries an approved external write", async () => {
 
 test("asks before a resolved external write", async () => {
   const repository = checkout();
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   try {
     const target = `${otherCheckout}/outside.ts`;
     const result = await guard().handler(
@@ -143,7 +178,7 @@ test("passes unresolved local targets without asking", async () => {
 
 test("asks before writes through symlinks into another repository", async () => {
   const repository = checkout();
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   try {
     symlinkSync(otherCheckout, `${repository}/outside`);
     const target = `${otherCheckout}/created.ts`;
@@ -161,7 +196,7 @@ test("asks before writes through symlinks into another repository", async () => 
 
 test("asks before a symlink write into an external repository", async () => {
   const repository = checkout();
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   try {
     symlinkSync(otherCheckout, `${repository}/outside`);
     const result = await guard().handler(
@@ -212,7 +247,7 @@ test("passes dangling symlink targets without asking", async () => {
 
 
 test("asks before moving to an external repository", async () => {
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   const repository = checkout();
   const destination = `${otherCheckout}/moved.ts`;
   try {
@@ -230,7 +265,7 @@ test("asks before moving to an external repository", async () => {
 });
 
 test("retries an approved move to an external repository", async () => {
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   const repository = checkout();
   const destination = `${otherCheckout}/moved.ts`;
   try {
@@ -252,7 +287,7 @@ test("retries an approved move to an external repository", async () => {
 
 test("asks before moving from an external repository", async () => {
   const repository = checkout();
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   const source = `${otherCheckout}/outside.ts`;
   try {
     writeFileSync(source, "export {};\n");
@@ -270,7 +305,7 @@ test("asks before moving from an external repository", async () => {
 
 test("retries an approved move from an external repository", async () => {
   const repository = checkout();
-  const otherCheckout = checkout(`git@github.com:${external}.git`);
+  const otherCheckout = checkoutOutsideTemporaryDirectory(`git@github.com:${external}.git`);
   const source = `${otherCheckout}/outside.ts`;
   try {
     writeFileSync(source, "export {};\n");
