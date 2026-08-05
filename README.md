@@ -29,10 +29,9 @@ printf '%s\n' '{"event":{"toolName":"bash","input":{"command":"git push https://
 omp plugin install github:klondikemarlen/omp-soft-boundary-guard
 ```
 
-After installing or reinstalling, start a new OMP process (or reload its extensions) before retesting. Existing OMP processes retain extension modules loaded at startup.
+After installing or reinstalling, start a new OMP process before retesting. Reloading extensions does not replace a module already loaded by the process.
 
-Approvals are held in memory only; a plugin reload does not carry an earlier approval into the new process.
-The blocked handoff is cached in memory for the pending confirmation and one exact retry. A changed mutation input or resolved target never uses the cached artifact or approval; an approved exact release remains pending until that invocation starts, another confirmation replaces it, the checkout changes, it is rejected, or the plugin reloads. No prompt artifact is written to disk or retained across runs. The baseline path rebuilt the canonical handoff on retry; the integration tests cover the optimized single-handoff path and changed-retry rejection.
+Approvals are held only in process memory; a plugin reload clears them, and a new OMP process does not carry an earlier approval. The blocked handoff is cached in memory for the pending confirmation and one exact retry. A changed mutation input or resolved target never uses the cached artifact or approval; an approved exact release remains pending until that invocation starts, another confirmation replaces it, the checkout changes, it is rejected, or the process ends. No prompt artifact is written to disk or retained across runs. The baseline path rebuilt the canonical handoff on retry; the integration tests cover the optimized single-handoff path and changed-retry rejection.
 
 Release, deploy, publish, and promote commands—including repository wrappers, package scripts, nested shell commands, and GitHub release writes—are soft-boundary checks. A release targeting the current checkout's resolved `klondikemarlen/*` GitHub origin is inside the built-in boundary and remains silently allowed, including under an active reviewed policy. Other or unresolved release targets report the full command and request the exact Ask when UI is available; without UI, the underlying operation proceeds. Only a guard-internal delegated call carrying an in-memory one-shot capability bypasses the interactive check; ordinary command fields, environment variables, and flags cannot.
 
