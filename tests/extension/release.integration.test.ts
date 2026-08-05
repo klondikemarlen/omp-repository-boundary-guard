@@ -137,7 +137,6 @@ test("retains external release approval through queued turn delivery", async () 
     const event = { toolName: "bash", input: { command: "npm run release" } };
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
     approve(instance, "release/deploy", external);
-    instance.turnStart();
     expect(await instance.handler(event, context(repository))).toBeUndefined();
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
   } finally {

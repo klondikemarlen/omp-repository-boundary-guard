@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 
-import { createRepositoryBoundaryGuard, type BoundaryGuardOptions, type ToolCallHandler, type TurnStartHandler } from "../../index.ts";
+import { createRepositoryBoundaryGuard, type BoundaryGuardOptions, type ToolCallHandler } from "../../index.ts";
 
 export const current = "klondikemarlen/omp-soft-boundary-guard";
 export const external = "elsewhere/example";
@@ -10,7 +10,6 @@ export const confirmationId = "confirm_repository_boundary_mutation";
 export type Guard = {
   handler: ToolCallHandler;
   answer(event: { toolName: string; input: Record<string, unknown>; details: unknown; isError: boolean }): void;
-  turnStart(): void;
   messages: string[];
   deliveries: Array<"steer" | "followUp">;
 };
@@ -18,13 +17,11 @@ export type Guard = {
 export function guard(options?: BoundaryGuardOptions): Guard {
   let handler: ToolCallHandler | undefined;
   let resultHandler: Guard["answer"] | undefined;
-  let turnStartHandler: TurnStartHandler | undefined;
   const messages: string[] = [];
   const deliveries: Guard["deliveries"] = [];
   createRepositoryBoundaryGuard(options)({
-    on: ((event: string, registered: ToolCallHandler | Guard["answer"] | TurnStartHandler) => {
+    on: ((event: string, registered: ToolCallHandler | Guard["answer"]) => {
       if (event === "tool_call") handler = registered as ToolCallHandler;
-      else if (event === "turn_start") turnStartHandler = registered as TurnStartHandler;
       else resultHandler = registered as Guard["answer"];
     }) as never,
     sendUserMessage: (message, options) => {
@@ -35,7 +32,6 @@ export function guard(options?: BoundaryGuardOptions): Guard {
   return {
     handler: handler!,
     answer: (event) => resultHandler!(event),
-    turnStart: () => turnStartHandler?.({}),
     messages,
     deliveries,
   };
