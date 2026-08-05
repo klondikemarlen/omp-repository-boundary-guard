@@ -108,7 +108,7 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
         }
         pi.sendUserMessage(
           `Call the ask tool now with this exact payload: ${JSON.stringify(handoff.ask)}. If approved, retry exactly the blocked ${handoff.action}; otherwise stop.`,
-          { deliverAs: "steer" },
+          { deliverAs: "followUp" },
         );
         return { block: true, reason: `${reason}${authorizationDetail} OMP ask confirmation requested.` };
       } catch {
