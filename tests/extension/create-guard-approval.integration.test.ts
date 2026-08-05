@@ -16,6 +16,20 @@ test("does not reissue a pending confirmation", async () => {
   }
 });
 
+test("queues a confirmation after the blocked mutation", async () => {
+  const repository = checkout();
+  try {
+    const instance = guard();
+    await instance.handler(
+      { toolName: "bash", input: { command: `gh issue comment 85 --repo ${external} --body "Queued"` } },
+      context(repository),
+    );
+    expect(instance.deliveries).toEqual(["followUp"]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("reissues after an approved mismatched confirmation clears pending state", async () => {
   const repository = checkout();
   const event = { toolName: "bash", input: { command: `gh issue create --repo ${external} --title "Mismatched approval"` } };

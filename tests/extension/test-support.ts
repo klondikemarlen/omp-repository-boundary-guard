@@ -12,6 +12,7 @@ export type Guard = {
   answer(event: { toolName: string; input: Record<string, unknown>; details: unknown; isError: boolean }): void;
   turnStart(): void;
   messages: string[];
+  deliveries: Array<"steer" | "followUp">;
 };
 
 export function guard(options?: BoundaryGuardOptions): Guard {
@@ -19,19 +20,24 @@ export function guard(options?: BoundaryGuardOptions): Guard {
   let resultHandler: Guard["answer"] | undefined;
   let turnStartHandler: TurnStartHandler | undefined;
   const messages: string[] = [];
+  const deliveries: Guard["deliveries"] = [];
   createRepositoryBoundaryGuard(options)({
     on: ((event: string, registered: ToolCallHandler | Guard["answer"] | TurnStartHandler) => {
       if (event === "tool_call") handler = registered as ToolCallHandler;
       else if (event === "turn_start") turnStartHandler = registered as TurnStartHandler;
       else resultHandler = registered as Guard["answer"];
     }) as never,
-    sendUserMessage: (message) => messages.push(message),
+    sendUserMessage: (message, options) => {
+      messages.push(message);
+      deliveries.push(options.deliverAs);
+    },
   });
   return {
     handler: handler!,
     answer: (event) => resultHandler!(event),
     turnStart: () => turnStartHandler?.({}),
     messages,
+    deliveries,
   };
 }
 

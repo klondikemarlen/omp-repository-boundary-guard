@@ -35,5 +35,5 @@ export type ExtensionAPI = {
   on(event: "tool_call", handler: ToolCallHandler): void;
   on(event: "tool_result", handler: ToolResultHandler): void;
   on(event: "turn_start", handler: TurnStartHandler): void;
-  sendUserMessage(content: string, options: { deliverAs: "steer" }): void;
+  sendUserMessage(content: string, options: { deliverAs: "steer" | "followUp" }): void;
 };
