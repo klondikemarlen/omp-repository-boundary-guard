@@ -46,6 +46,20 @@ test("asks for release in a different owner's checkout", async () => {
   }
 });
 
+test("allows cross-boundary releases in advisory mode", async () => {
+  const repository = checkout(`https://github.com/${external}.git`);
+  try {
+    const instance = guard({ enforce: false });
+    expect(await instance.handler(
+      { toolName: "bash", input: { command: "npm run release" } },
+      context(repository),
+    )).toBeUndefined();
+    expect(instance.messages).toEqual([]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("asks when an owned checkout release specifies another repository", async () => {
   const repository = checkout();
   try {

@@ -19,7 +19,7 @@ export function guard(options?: BoundaryGuardOptions): Guard {
   let resultHandler: Guard["answer"] | undefined;
   const messages: string[] = [];
   const deliveries: Guard["deliveries"] = [];
-  createRepositoryBoundaryGuard(options)({
+  createRepositoryBoundaryGuard({ enforce: true, ...options })({
     on: ((event: string, registered: ToolCallHandler | Guard["answer"]) => {
       if (event === "tool_call") handler = registered as ToolCallHandler;
       else resultHandler = registered as Guard["answer"];

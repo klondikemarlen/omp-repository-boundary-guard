@@ -52,6 +52,23 @@ test("asks for high-risk outside classification and preserves exact retry safety
   }
 });
 
+test("allows high-risk policy classifications in advisory mode", async () => {
+  const repository = checkout();
+  const recorder = new AdvisoryRecorder();
+  try {
+    const instance = guard({
+      enforce: false,
+      policy,
+      recorder,
+      classifier: async () => ({ classification: "outside", risk: "high", reason: "production target" }),
+    });
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toBeUndefined();
+    expect(instance.messages).toEqual([]);
+    expect(recorder.evidence()).toMatchObject([{ classification: "outside", risk: "high", outcome: "allowed" }]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
 
 test("allows uncertain low-risk writes with an advisory record", async () => {
   const repository = checkout();
