@@ -10,8 +10,7 @@ Opt-in OMP extension that offers a soft, best-guess warning when a recognized mu
 - Supported `xd://github` issue and pull-request writes.
 
 The guard asks when it can resolve a supported mutation and identify a target outside the active boundary. Same-boundary mutations remain silent. Read-only operations, unknown or malformed operations, dynamic or ambiguous commands, unresolved paths, unresolved repositories, and missing checkout information pass through without an Ask. The underlying tool remains responsible for validating anything the guard cannot classify confidently.
-
-GraphQL `gh api` requests are conservatively target-resolved only for a single `resolveReviewThread` mutation; other GraphQL mutations remain unresolved and pass through.
+Static GraphQL queries pass through as read-only; every GraphQL mutation remains unresolved and passes through without an Ask.
 
 The current built-in boundary is the invoking session's normalized GitHub `origin`, or its canonical Git root when no GitHub origin exists. Tool `cwd`, shell `cd … &&`, and Git `-C` help resolve a target, but never redefine the boundary. A different local checkout or resolved GitHub repository triggers one standard OMP Ask; one approval authorizes exactly one matching retry.
 
