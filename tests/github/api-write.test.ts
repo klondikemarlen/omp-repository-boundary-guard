@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
+import { repositoryMutationHandoff } from "../../guard/handoff.ts";
 import { githubApiWrite } from "../../github/api-write.ts";
-import { reviewThreadRepository } from "../../github/review-thread-repository.ts";
 
 function graphqlWrite(document: string) {
   return githubApiWrite(["gh", "api", "graphql", "-f", `query=${document}`], 2, { command: "gh api graphql" });
@@ -18,28 +21,25 @@ test("keeps non-review GraphQL mutations unresolved", () => {
   });
 });
 
-test("identifies one executable review-thread mutation", () => {
-  expect(graphqlWrite(`mutation ResolveThread @skip(if: false) {
-    # resolveReviewThread(input: { threadId: "comment" })
-    resolved: resolveReviewThread(input: { threadId: "thread" }) @skip(if: false) { thread { isResolved } }
-  }`)).toMatchObject({ reviewThreadId: "thread", targetUnresolved: false });
-});
+test("keeps review-thread mutations unresolved without calling gh", () => {
+  const directory = mkdtempSync(join(tmpdir(), "omp-soft-boundary-guard-gh-"));
+  const executable = join(directory, "gh");
+  writeFileSync(executable, "#!/bin/sh\nexec sleep 30\n");
+  chmodSync(executable, 0o755);
 
-test("keeps review-thread mutations unresolved for non-GitHub hosts", () => {
-  expect(
-    githubApiWrite(
-      ["gh", "api", "graphql", "--hostname", "ghe.example", "-f", 'query=mutation { resolveReviewThread(input: { threadId: "thread" }) { thread { isResolved } } }'],
-      2,
-      { command: "gh api graphql --hostname ghe.example" },
-    ),
-  ).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
-});
-
-test("keeps ambiguous review-thread mutations unresolved", () => {
-  expect(graphqlWrite(`mutation {
-    resolveReviewThread(input: { threadId: "first" }) { thread { id } }
-    deleteIssue(input: { issueId: "issue" }) { clientMutationId }
-  }`)).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
+  const originalPath = process.env.PATH;
+  try {
+    process.env.PATH = `${directory}:${originalPath}`;
+    const startedAt = Date.now();
+    expect(repositoryMutationHandoff(
+      { toolName: "bash", input: { command: `gh api graphql -f 'query=mutation { resolveReviewThread(input: { threadId: "thread" }) { thread { isResolved } } }'` } },
+      process.cwd(),
+    )).toMatchObject({ decision: "allow" });
+    expect(Date.now() - startedAt).toBeLessThan(2_000);
+  } finally {
+    process.env.PATH = originalPath;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("keeps multiple GraphQL operations unresolved", () => {
@@ -49,20 +49,6 @@ test("keeps multiple GraphQL operations unresolved", () => {
   mutation Second {
     resolveReviewThread(input: { threadId: "second" }) { thread { id } }
   }`)).toMatchObject({ action: "GitHub API write", targetUnresolved: true });
-});
-
-test("resolves a review thread to its canonical repository", () => {
-  const repository = reviewThreadRepository("thread", (threadId) => {
-    expect(threadId).toBe("thread");
-    return JSON.stringify({ data: { node: { pullRequest: { repository: { nameWithOwner: "Owner/Repository" } } } } });
-  });
-
-  expect(repository).toBe("owner/repository");
-});
-
-test("rejects incomplete and failed review-thread lookups", () => {
-  expect(reviewThreadRepository("thread", () => JSON.stringify({ data: { node: {} } }))).toBeUndefined();
-  expect(reviewThreadRepository("thread", () => { throw new Error("lookup failed"); })).toBeUndefined();
 });
 
 test("keeps explicit GET requests with fields read-only", () => {

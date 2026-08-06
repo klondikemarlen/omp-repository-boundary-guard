@@ -1,6 +1,6 @@
 {
   "name": "omp-soft-boundary-guard",
-  "version": "1.8.5",
+  "version": "1.8.6",
   "description": "Opt-in OMP soft boundary guard with deterministic adapters and advisory confirmation for uncertain writes.",
   "type": "module",
   "scripts": {

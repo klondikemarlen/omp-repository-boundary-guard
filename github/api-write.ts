@@ -150,86 +150,12 @@ function graphqlOperation(document: string): "query" | "mutation" | undefined {
   return count === 1 && operation !== "subscription" ? operation : undefined;
 }
 
-function matchingToken(tokens: GraphqlToken[], start: number, opening: string, closing: string): number | undefined {
-  let depth = 0;
-  for (let index = start; index < tokens.length; index += 1) {
-    if (tokens[index]!.value === opening) depth += 1;
-    if (tokens[index]!.value === closing && --depth === 0) return index;
-  }
-  return undefined;
-}
-
-type ReviewThread = { id: string } | { unresolved: true };
-
-function reviewThread(document: string): ReviewThread | undefined {
-  const tokens = graphqlTokens(document);
-  if (!tokens) return document.includes("resolveReviewThread") ? { unresolved: true } : undefined;
-
-  const mutation = tokens.findIndex((token) => token.type === "name" && token.value === "mutation");
-  const call = tokens.findIndex((token, index) =>
-    token.type === "name" && token.value === "resolveReviewThread" && tokens[index + 1]?.value === "(",
-  );
-  if (call < 0) return undefined;
-  if (mutation < 0) return { unresolved: true };
-
-  const selection = tokens.findIndex((token, index) => index > mutation && token.value === "{");
-  const selectionEnd = selection < 0 ? undefined : matchingToken(tokens, selection, "{", "}");
-  if (selection < 0 || selectionEnd === undefined) return { unresolved: true };
-
-  let fieldCount = 0;
-  let threadId: string | undefined;
-  for (let index = selection + 1; index < selectionEnd;) {
-    const field = tokens[index];
-    if (!field || field.type !== "name") return { unresolved: true };
-    let fieldName = field.value;
-    index += 1;
-    if (tokens[index]?.value === ":") {
-      const aliasedField = tokens[index + 1];
-      if (!aliasedField || aliasedField.type !== "name") return { unresolved: true };
-      fieldName = aliasedField.value;
-      index += 2;
-    }
-    if (fieldName !== "resolveReviewThread" || tokens[index]?.value !== "(") return { unresolved: true };
-    fieldCount += 1;
-
-    const argumentsEnd = matchingToken(tokens, index, "(", ")");
-    if (argumentsEnd === undefined || argumentsEnd >= selectionEnd) return { unresolved: true };
-    for (let argument = index + 1; argument < argumentsEnd; argument += 1) {
-      if (tokens[argument]?.type !== "name" || tokens[argument]?.value !== "threadId" || tokens[argument + 1]?.value !== ":") continue;
-      const value = tokens[argument + 2];
-      if (!value || value.type !== "string" || threadId) return { unresolved: true };
-      threadId = value.value;
-    }
-    index = argumentsEnd + 1;
-
-    while (tokens[index]?.value === "@") {
-      if (tokens[index + 1]?.type !== "name") return { unresolved: true };
-      index += 2;
-      if (tokens[index]?.value === "(") {
-        const directiveEnd = matchingToken(tokens, index, "(", ")");
-        if (directiveEnd === undefined || directiveEnd >= selectionEnd) return { unresolved: true };
-        index = directiveEnd + 1;
-      }
-    }
-    if (tokens[index]?.value === "{") {
-      const responseEnd = matchingToken(tokens, index, "{", "}");
-      if (responseEnd === undefined || responseEnd >= selectionEnd) return { unresolved: true };
-      index = responseEnd + 1;
-    }
-  }
-  return fieldCount === 1 && threadId ? { id: threadId } : { unresolved: true };
-}
-
 export function githubApiWrite(words: (string | undefined)[], index: number, input: ToolInput): GitHubWrite | undefined {
   if (isHelpRequest(words, index)) return undefined;
-  const isGraphQL = words[index] === "graphql";
-  let thread: ReviewThread | undefined;
-  if (isGraphQL) {
+  if (words[index] === "graphql") {
     const document = graphqlQuery(words, index + 1, input);
-    const operation = document ? graphqlOperation(document) : undefined;
-    thread = document ? reviewThread(document) : undefined;
-    if (operation === "query") return undefined;
-    if (!operation || !thread || "unresolved" in thread) return { action: "GitHub API write", targetUnresolved: true };
+    if (document && graphqlOperation(document) === "query") return undefined;
+    return { action: "GitHub API write", targetUnresolved: true };
   }
 
   const targetInfo = githubTarget(words, index);
@@ -268,23 +194,18 @@ export function githubApiWrite(words: (string | undefined)[], index: number, inp
       (typeof word === "string" && /^(?:--hostname|--jq|--template|--header|-H)=/.test(word));
     if (valueFlag) {
       hasFields ||= fieldFlag;
-      if (!isGraphQL) {
-        skipNext = word === "--raw-field" || word === "-f" || word === "--field" || word === "-F" || word === "--input" ||
-          word === "--hostname" || word === "--jq" || word === "--template" || word === "--header" || word === "-H";
-        continue;
-      }
+      skipNext = word === "--raw-field" || word === "-f" || word === "--field" || word === "-F" || word === "--input" ||
+        word === "--hostname" || word === "--jq" || word === "--template" || word === "--header" || word === "-H";
+      continue;
     }
     const path = typeof word === "string" ? word.match(/(?:^|\/)repos\/([^/\s]+)\/([^/?\s]+)/i) : undefined;
-    if (path && (!isGraphQL || !target)) target = normalizeRepository(`${path[1]}/${path[2]}`);
+    if (path) target = normalizeRepository(`${path[1]}/${path[2]}`);
   }
 
   if (!methodUnresolved && method === "GET" && (!hasFields || methodExplicit)) return undefined;
-  const reviewThreadId = thread && "id" in thread ? thread.id : undefined;
-
   return {
     action: "GitHub API write",
     target,
-    targetUnresolved: targetInfo.targetUnresolved || hostnameUnresolved || methodUnresolved || (!target && !thread),
-    reviewThreadId,
+    targetUnresolved: targetInfo.targetUnresolved || hostnameUnresolved || methodUnresolved || !target,
   };
 }
