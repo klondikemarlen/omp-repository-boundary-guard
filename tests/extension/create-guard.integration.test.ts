@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { relative } from "node:path";
 
 import {
@@ -97,6 +97,28 @@ test("allows cross-repository mutations in advisory mode", async () => {
     expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toBeUndefined();
     expect(instance.messages).toEqual([]);
   } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("skips checkout probing for unrelated advisory calls", async () => {
+  const repository = checkout();
+  const executable = `${repository}/git`;
+  const probe = `${repository}/checkout-probed`;
+  const originalPath = process.env.PATH;
+  try {
+    writeFileSync(executable, `#!/bin/sh\n: > "${probe}"\n`);
+    chmodSync(executable, 0o755);
+    process.env.PATH = `${repository}:${originalPath}`;
+
+    const result = await guard({ enforce: false }).handler(
+      { toolName: "read", input: { path: "README.md" } },
+      context(repository),
+    );
+
+    expect([result, existsSync(probe)]).toEqual([undefined, false]);
+  } finally {
+    process.env.PATH = originalPath;
     rmSync(repository, { recursive: true, force: true });
   }
 });
