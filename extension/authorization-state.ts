@@ -74,7 +74,7 @@ export class AuthorizationState {
     }
   }
 
-  artifact(identity: string): RepositoryMutationHandoff | undefined {
+  artifact(identity: string): AuthorizationHandoff | undefined {
     if (this.#pending?.identity === identity) return this.#pending.handoff;
     if (this.#authorized?.identity === identity) return this.#authorized.handoff;
     return undefined;
