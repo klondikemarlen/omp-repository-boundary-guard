@@ -184,6 +184,25 @@ test("consumes an approved push once", async () => {
   }
 });
 
+test("requires fresh approval when the default push remote changes", async () => {
+  const repository = checkout();
+  const changed = "elsewhere/changed";
+  try {
+    execFileSync("git", ["-C", repository, "remote", "add", "deploy", `https://github.com/${external}.git`]);
+    execFileSync("git", ["-C", repository, "config", "remote.pushDefault", "deploy"]);
+    const instance = guard();
+    const event = { toolName: "bash", input: { command: "git push" } };
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+    approve(instance, "git push", external, "\nCommand: git push");
+
+    execFileSync("git", ["-C", repository, "remote", "set-url", "deploy", `https://github.com/${changed}.git`]);
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+    expect(instance.messages.at(-1)).toContain(changed);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("does not carry approval across session directories", async () => {
   const repository = checkout();
   const sibling = checkout();
