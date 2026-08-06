@@ -1,3 +1,4 @@
+import { currentCheckoutRoot } from "../git/current-checkout.ts";
 import type { BoundaryClassifier, BoundaryClassificationResult } from "../boundary/classifier.ts";
 import { createOmpBoundaryClassifier } from "../boundary/omp-classifier.ts";
 import type { AdvisoryRecorder } from "../boundary/advisory.ts";
@@ -43,7 +44,6 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
       const activePolicy = isActiveBoundaryPolicy(configuredPolicy) ? configuredPolicy : undefined;
       let handoff: RepositoryMutationHandoff | undefined;
       try {
-        authorization.resetFor(context.cwd);
         const identity = retryIdentity(event.toolName, event.input, context.cwd);
         const configuredClassifier = context.boundaryClassifier ?? options.classifier ?? (activePolicy ? createOmpBoundaryClassifier(context) : undefined);
         const resolvedHandoff = repositoryMutationHandoff(event, context.cwd);
@@ -86,6 +86,8 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
         }
 
         if (handoff.decision === "allow") return;
+        const checkoutRoot = currentCheckoutRoot(context.cwd);
+        authorization.resetFor(checkoutRoot ?? context.cwd);
 
         const reason = handoff.category === "release"
           ? `Blocked ${handoff.action} targeting ${handoff.target}: confirmation is required. Command: ${event.input.command ?? "unavailable"}.`

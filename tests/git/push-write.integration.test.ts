@@ -200,6 +200,23 @@ test("does not carry approval across session directories", async () => {
   }
 });
 
+test("does not retain approval after an allowed call in a sibling checkout", async () => {
+  const repository = checkout();
+  const sibling = checkout();
+  try {
+    const instance = guard();
+    const event = { toolName: "bash", input: { command: `git push https://github.com/${external}.git HEAD` } };
+    await instance.handler(event, context(repository));
+    approve(instance, "git push", external, `\nCommand: ${event.input.command}`);
+
+    expect(await instance.handler({ toolName: "bash", input: { command: "git status --short" } }, context(sibling))).toBeUndefined();
+    expect(await instance.handler(event, context(sibling))).toMatchObject({ block: true });
+  } finally {
+    rmSync(sibling, { recursive: true, force: true });
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("re-prompts after an interrupted approval", async () => {
   const repository = checkout();
   try {
