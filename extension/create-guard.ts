@@ -4,7 +4,7 @@ import { createOmpBoundaryClassifier } from "../boundary/omp-classifier.ts";
 import { isActiveBoundaryPolicy, type ActiveBoundaryPolicy } from "../boundary/policy.ts";
 import type { ExtensionAPI, ToolCallResult } from "./contract.ts";
 import { AuthorizationState } from "./authorization-state.ts";
-import { currentCheckoutBoundary, currentCheckoutRoot } from "../git/current-checkout.ts";
+import { currentCheckoutRoot } from "../git/current-checkout.ts";
 import { retryIdentity } from "../guard/authorization-key.ts";
 import { askHandoff, type RepositoryMutationHandoff } from "../guard/ask.ts";
 import type { BoundaryCategory } from "../guard/confirmation-question.ts";
@@ -47,6 +47,30 @@ function classifierFor(
   if (options.classifier) return options.classifier;
   if (!policy) return undefined;
   return createOmpBoundaryClassifier(context);
+}
+
+function sessionScope(handoff: AskHandoff, cwd: string): string {
+  const root = currentCheckoutRoot(cwd) ?? cwd;
+  return `${root}\u0000${handoff.currentRepository ?? handoff.fingerprint}`;
+}
+
+function authorizationIdentity(
+  authorization: AuthorizationState,
+  event: { toolName: string; input: Record<string, unknown> },
+  cwd: string,
+  scope: string,
+): string {
+  authorization.resetFor(scope);
+  return retryIdentity(event.toolName, event.input, cwd);
+}
+
+function reusableHandoff(
+  authorization: AuthorizationState,
+  identity: string,
+  handoff: AskHandoff,
+): AskHandoff | undefined {
+  const cached = authorization.artifact(identity);
+  return cached?.fingerprint === handoff.fingerprint ? cached : undefined;
 }
 
 async function classify(
@@ -155,22 +179,22 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
       const classifier = classifierFor(activePolicy, options, context, context.boundaryClassifier);
 
       try {
-        const root = currentCheckoutRoot(context.cwd) ?? context.cwd;
-        const boundary = currentCheckoutBoundary(context.cwd) ?? "";
-        authorization.resetFor(`${root}\u0000${boundary}`);
-
-        const identity = retryIdentity(event.toolName, event.input, context.cwd);
         const resolvedHandoff = repositoryMutationHandoff(event, context.cwd);
-        const cachedHandoff = options.enforce ? authorization.artifact(identity) : undefined;
-        const reusableHandoff = cachedHandoff?.decision === "ask" &&
-          resolvedHandoff.decision === "ask" &&
-          cachedHandoff.fingerprint === resolvedHandoff.fingerprint
-          ? cachedHandoff
-          : undefined;
-        let handoff = reusableHandoff ?? resolvedHandoff;
+        let handoff = resolvedHandoff;
+        let reusedHandoff = false;
+        let scope: string | undefined;
+        if (options.enforce && resolvedHandoff.decision === "ask") {
+          scope ??= sessionScope(resolvedHandoff, context.cwd);
+          const identity = authorizationIdentity(authorization, event, context.cwd, scope);
+          const cachedHandoff = reusableHandoff(authorization, identity, resolvedHandoff);
+          if (cachedHandoff) {
+            handoff = cachedHandoff;
+            reusedHandoff = true;
+          }
+        }
 
         if (
-          !reusableHandoff &&
+          !reusedHandoff &&
           handoff.decision === "allow" &&
           handoff.action !== undefined &&
           handoff.action !== "release/deploy" &&
@@ -197,6 +221,8 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
           console.warn(warningFor(handoff));
           return;
         }
+        scope ??= sessionScope(handoff, context.cwd);
+        const identity = authorizationIdentity(authorization, event, context.cwd, scope);
         return requestConfirmation(authorization, pi, handoff, event, context.hasUI, identity);
       } catch {
         if (configuredPolicy) {
