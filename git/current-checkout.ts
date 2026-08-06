@@ -3,9 +3,14 @@ import { dirname } from "node:path";
 import { remoteRepository } from "../github/remote-repository.ts";
 import { gitCommandOutput } from "./command.ts";
 
+const CHECKOUT_RESOLUTION_TIMEOUT_MS = 1_000;
+
 export function currentCheckoutRoot(cwd: string): string | undefined {
+  const deadline = Date.now() + CHECKOUT_RESOLUTION_TIMEOUT_MS;
   let directory = cwd;
   for (;;) {
+    if (Date.now() >= deadline) return undefined;
+
     const root = gitCommandOutput(directory, ["rev-parse", "--show-toplevel"]);
     try {
       if (root) return realpathSync(root);

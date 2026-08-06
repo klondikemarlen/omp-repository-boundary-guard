@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 
 import { approve, checkout, context, external, guard } from "./test-support.ts";
 
@@ -79,6 +79,22 @@ test("executes one exact approved issue creation retry", async () => {
 
     expect(await instance.handler(event, context(repository))).toBeUndefined();
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("authorizes one exact retry from a nested directory", async () => {
+  const repository = checkout();
+  const nestedDirectory = `${repository}/nested`;
+  const event = { toolName: "bash", input: { command: `gh issue create --repo ${external} --title "Nested"` } };
+  try {
+    mkdirSync(nestedDirectory);
+    const instance = guard();
+    expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
+    approve(instance, "GitHub issue creation", external);
+
+    expect(await instance.handler(event, context(nestedDirectory))).toBeUndefined();
   } finally {
     rmSync(repository, { recursive: true, force: true });
   }
