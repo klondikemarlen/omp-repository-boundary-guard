@@ -160,11 +160,17 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
         authorization.resetFor(`${root}\u0000${boundary}`);
 
         const identity = retryIdentity(event.toolName, event.input, context.cwd);
+        const resolvedHandoff = repositoryMutationHandoff(event, context.cwd);
         const cachedHandoff = options.enforce ? authorization.artifact(identity) : undefined;
-        let handoff = cachedHandoff ?? repositoryMutationHandoff(event, context.cwd);
+        const reusableHandoff = cachedHandoff?.decision === "ask" &&
+          resolvedHandoff.decision === "ask" &&
+          cachedHandoff.fingerprint === resolvedHandoff.fingerprint
+          ? cachedHandoff
+          : undefined;
+        let handoff = reusableHandoff ?? resolvedHandoff;
 
         if (
-          !cachedHandoff &&
+          !reusableHandoff &&
           handoff.decision === "allow" &&
           handoff.action !== undefined &&
           handoff.action !== "release/deploy" &&

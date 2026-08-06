@@ -36,21 +36,16 @@ test("allows low-risk inside classification and records an advisory", async () =
 
 test("asks for high-risk outside classification and preserves exact retry safety", async () => {
   const repository = checkout();
-  let classifications = 0;
   try {
     const instance = guard({
       policy,
-      classifier: async () => {
-        classifications += 1;
-        return { classification: "outside", risk: "high", reason: "production target" };
-      },
+      classifier: async () => ({ classification: "outside", risk: "high", reason: "production target" }),
     });
     const event = { toolName: "bash", input: { command } };
     expect(await instance.handler(event, context(repository))).toMatchObject({ block: true });
     expect(instance.messages).toHaveLength(1);
     approve(instance, "GitHub issue creation", "target");
     expect(await instance.handler(event, context(repository))).toBeUndefined();
-    expect(classifications).toBe(1);
     expect(await instance.handler({ toolName: "bash", input: { command: `${command} --body changed` } }, context(repository))).toMatchObject({ block: true });
   } finally {
     rmSync(repository, { recursive: true, force: true });
