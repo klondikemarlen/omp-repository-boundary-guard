@@ -10,6 +10,7 @@ import {
 import {
   approve,
   checkout,
+  checkoutOutsideTemporaryDirectory,
   confirmationId,
   context,
   current,
@@ -84,6 +85,33 @@ test("guards cross-repository pull-request comments", async () => {
     expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toMatchObject({ block: true });
     expect(instance.messages).toHaveLength(1);
   } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("allows cross-repository mutations in advisory mode", async () => {
+  const repository = checkout();
+  const command = `gh pr comment 1 --repo ${external} --body "External"`;
+  try {
+    const instance = guard({ enforce: false });
+    expect(await instance.handler({ toolName: "bash", input: { command } }, context(repository))).toBeUndefined();
+    expect(instance.messages).toEqual([]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("allows external local writes in advisory mode", async () => {
+  const repository = checkout();
+  const otherRepository = checkoutOutsideTemporaryDirectory(null);
+  const event = { toolName: "write", input: { path: `${otherRepository}/outside.ts`, content: "" } };
+  try {
+    expect(repositoryMutationHandoff(event, repository)).toMatchObject({ decision: "ask", action: "file write" });
+    const instance = guard({ enforce: false });
+    expect(await instance.handler(event, context(repository))).toBeUndefined();
+    expect(instance.messages).toEqual([]);
+  } finally {
+    rmSync(otherRepository, { recursive: true, force: true });
     rmSync(repository, { recursive: true, force: true });
   }
 });

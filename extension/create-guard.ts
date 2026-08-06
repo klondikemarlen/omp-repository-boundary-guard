@@ -10,14 +10,11 @@ import { askHandoff, type RepositoryMutationHandoff } from "../guard/ask.ts";
 import { repositoryMutationHandoff } from "../guard/handoff.ts";
 
 export type BoundaryGuardOptions = {
+  enforce?: boolean;
   policy?: ActiveBoundaryPolicy;
   classifier?: BoundaryClassifier;
   recorder?: AdvisoryRecorder;
 };
-
-function classificationNeedsAsk(result: BoundaryClassificationResult): boolean {
-  return result.classification === "outside" || result.risk !== "low";
-}
 
 function advisoryHandoff(
   handoff: Extract<RepositoryMutationHandoff, { decision: "allow" }>,
@@ -70,22 +67,30 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
             risk: "low" as const,
             reason: "boundary classifier unavailable",
           };
+          const needsWarning = classification !== undefined &&
+            (classification.classification === "outside" || classification.risk !== "low");
+          const outcome = needsWarning && context.hasUI && options.enforce ? "asked" : "allowed";
           try {
             options.recorder?.record({
               action: handoff.action,
               target: handoff.target,
               ...result,
-              outcome: classification && classificationNeedsAsk(result) && context.hasUI ? "asked" : "allowed",
+              outcome,
             });
           } catch {
             // Advisory recording must not change the write decision.
           }
-          if (classification && classificationNeedsAsk(classification)) {
-            handoff = advisoryHandoff(handoff, event, context.cwd);
+          if (needsWarning) {
+            if (options.enforce) handoff = advisoryHandoff(handoff, event, context.cwd);
+            else console.warn(`Soft boundary warning: ${handoff.action} targets ${handoff.target}. The operation will proceed.`);
           }
         }
 
         if (handoff.decision === "allow") return;
+        if (!options.enforce) {
+          console.warn(`Soft boundary warning: ${handoff.action} targets ${handoff.target}. The operation will proceed.`);
+          return;
+        }
         const checkoutRoot = currentCheckoutRoot(context.cwd);
         authorization.resetFor(checkoutRoot ?? context.cwd);
 
@@ -128,6 +133,7 @@ export function createRepositoryBoundaryGuard(options: BoundaryGuardOptions = {}
           }
           return;
         }
+        if (!options.enforce) return;
         return { block: true, reason: "Boundary guard failed before confirmation could be completed." };
       }
     });
